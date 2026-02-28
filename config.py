@@ -1,10 +1,29 @@
 import os
+import configparser
 from dotenv import load_dotenv
 
 # config 폴더 안의 .env 파일을 확실하게 로드합니다.
 base_dir = os.path.dirname(os.path.abspath(__file__))
 env_path = os.path.join(base_dir, 'config', '.env')
 load_dotenv(env_path)
+
+# [우선순위 2순위] 로컬 kis_key.ini 파일 파서 준비
+ini_parser = configparser.ConfigParser()
+ini_path = os.path.join(base_dir, 'kis_key.ini')
+if os.path.exists(ini_path):
+    ini_parser.read(ini_path, encoding='utf-8')
+
+def get_secret(section: str, key: str, env_key: str):
+    """
+    1순위: 환경변수 (Railway 배포용, .env 포함)
+    2순위: kis_key.ini (로컬 테스트용 백업)
+    """
+    val = os.environ.get(env_key)
+    if val:
+        return val
+    if ini_parser.has_section(section) and ini_parser.has_option(section, key):
+        return ini_parser.get(section, key)
+    return None
 
 # ==========================================
 # 자동매매 시스템 환경 설정 파일 (config.py)
@@ -73,8 +92,8 @@ HIT_RATE_CHECK_DAYS = 5
 # AI 적중(HIT) 판단 기준 수익률 (기본값: +3%)
 HIT_THRESHOLD_PCT = 0.03
 
-# GEMINI_API_KEY: 환경변수에서 가져오기
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+# GEMINI_API_KEY: 환경변수 -> ini 순서로 가져오기
+GEMINI_API_KEY = get_secret('GEMINI', 'API_KEY', 'GEMINI_API_KEY')
 
 
 # [5. 거시경제 임계값]
@@ -95,14 +114,14 @@ MAX_DAILY_LOSS = -0.05
 
 
 # [7. 텔레그램 설정]
-TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
-TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
+TELEGRAM_TOKEN = get_secret('TELEGRAM', 'TOKEN', 'TELEGRAM_TOKEN')
+TELEGRAM_CHAT_ID = get_secret('TELEGRAM', 'CHAT_ID', 'TELEGRAM_CHAT_ID')
 
 
 # [8. 한투 API 설정]
-KIS_APP_KEY = os.environ.get("KIS_APP_KEY")
-KIS_APP_SECRET = os.environ.get("KIS_APP_SECRET")
-KIS_ACCOUNT_NO = os.environ.get("KIS_ACCOUNT_NO")
+KIS_APP_KEY = get_secret('KIS', 'APP_KEY', 'KIS_APP_KEY')
+KIS_APP_SECRET = get_secret('KIS', 'APP_SECRET', 'KIS_APP_SECRET')
+KIS_ACCOUNT_NO = get_secret('KIS', 'ACCOUNT_NO', 'KIS_ACCOUNT_NO')
 
 # 증권사 서버 요청 간격 (단위: 초) - 기존 유지
 # 너무 자주 요청하면 접속 차단될 수 있으므로 대기시간을 설정합니다.
