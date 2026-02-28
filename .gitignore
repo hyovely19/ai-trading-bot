@@ -1,0 +1,16 @@
+# 보안 정보
+.env
+
+# 파이썬 캐시 파일
+__pycache__/
+*.py[cod]
+*$py.class
+
+# 가상 환경
+venv/
+env/
+.venv/
+
+# 시스템 로그 및 임시 파일
+*.log
+.DS_Store
