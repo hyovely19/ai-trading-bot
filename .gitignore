@@ -1,5 +1,6 @@
 # 보안 정보
 .env
+kis_key.ini
 
 # 파이썬 캐시 파일
 __pycache__/
