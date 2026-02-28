@@ -61,6 +61,12 @@ PYRAMID_TRIGGER_3 = 0.04
 # 최소 AI 점수 (기본값: 70)
 MIN_AI_SCORE = 70
 
+# AI 적중률 체크 기간 (기본값: 5일 후 성과 관찰)
+HIT_RATE_CHECK_DAYS = 5
+
+# AI 적중(HIT) 판단 기준 수익률 (기본값: +3%)
+HIT_THRESHOLD_PCT = 0.03
+
 # GEMINI_API_KEY: 환경변수에서 가져오기
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 

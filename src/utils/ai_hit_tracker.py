@@ -1,80 +1,163 @@
-# AI(또는 우리 전략)가 얼마나 주식 시장을 잘 맞히고 있는지,
-# 즉 '승률'과 '수익률'을 기록하고 평가하는 파일입니다.
+import os
+import sys
+import logging
+from datetime import datetime, timedelta
+from typing import List, Dict, Any
+
+# 프로젝트 최상단 폴더 인식
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+import config
+from src.utils import load_json, save_json, setup_logger
+
+# 로거 설정
+logger = setup_logger("AI_HitTracker")
 
 class AIHitTracker:
-    """AI 투자 모델의 예측 성공률(승률)을 추적하는 클래스"""
+    """AI 투자 모델의 예측 성공률(적중률)을 추적하고 매매 비중을 동적으로 조절하는 클래스"""
     
     def __init__(self):
-        """
-        승률 계산에 필요한 과거 기록들(몇 번 이기고 졌는지)을 저장할 공간을 만듭니다.
-        """
-        self.total_trades = 0       # 총 거래 횟수
-        self.winning_trades = 0     # 이익을 본 거래 횟수 (승리)
-        self.losing_trades = 0      # 손해를 본 거래 횟수 (패배)
-        self.trade_history = []     # 과거 모든 거래 기록을 담아두는 리스트
+        self.filename = "ai_predictions.json"
+        self.predictions = self._load_data()
 
-    def record_trade_result(self, stock_code: str, buy_price: int, sell_price: int):
+    def _load_data(self) -> List[Dict[str, Any]]:
+        """과거 예측 데이터 로드"""
+        data = load_json(self.filename)
+        if isinstance(data, dict) and 'predictions' in data:
+            return data['predictions']
+        return []
+
+    def _save_data(self):
+        """예측 데이터 저장"""
+        save_json({'predictions': self.predictions}, self.filename)
+
+    def record_prediction(self, symbol: str, name: str, price: float, score: int):
         """
-        주식을 사고팔 때마다 그 결과를 기록 장부에 적습니다.
-        
-        Args:
-            stock_code (str): 거래한 종목코드
-            buy_price (int): 샀던 가격
-            sell_price (int): 팔았던 가격
+        AI 추천 종목 기록 (Step 2에서 호출)
+        동일 종목+날짜 중복 방지 및 최근 100건 유지
         """
-        # 주식을 팔았을 때 수익이 났는지(샀던 가격보다 비싸게 팔았는지) 확인합니다.
-        profit_amount = sell_price - buy_price
+        today = datetime.now().strftime('%Y-%m-%d')
         
-        # 0보다 크면 이익을 본 것(승리)
-        if profit_amount > 0:
-            self.winning_trades += 1
-            is_win = True
-        # 그렇지 않다면 손해를 본 것(패배)
+        # 중복 체크
+        for pred in self.predictions:
+            if pred['symbol'] == symbol and pred['date'] == today:
+                logger.info(f"알림: {name}({symbol})은 오늘 이미 기록되었습니다.")
+                return
+
+        new_pred = {
+            'symbol': symbol,
+            'name': name,
+            'prediction_price': price,
+            'prediction_score': score,
+            'date': today,
+            'result': 'PENDING', # HIT, MISS, PENDING
+            'result_price': 0,
+            'profit_rate': 0,
+            'checked_date': None
+        }
+        
+        self.predictions.insert(0, new_pred) # 최신순 정렬
+        self.predictions = self.predictions[:100] # 최근 100건 유지
+        self._save_data()
+        logger.info(f"📝 AI 예측 기록 완료: {name}({symbol}), 점수: {score}")
+
+    def update_results(self, broker) -> int:
+        """
+        5일 지난 예측의 결과 업데이트 (Step 0에서 호출)
+        현재가 조회 -> 수익률 계산 -> (+3% 이상 HIT, 미만 MISS)
+        """
+        updated_count = 0
+        now = datetime.now()
+        check_days = getattr(config, 'HIT_RATE_CHECK_DAYS', 5)
+        threshold = getattr(config, 'HIT_THRESHOLD_PCT', 0.03)
+
+        for pred in self.predictions:
+            # 아직 결과 확인 안 된 건만 대상
+            if pred['result'] != 'PENDING':
+                continue
+            
+            pred_date = datetime.strptime(pred['date'], '%Y-%m-%d')
+            # 5일이 경과했는지 확인
+            if now - pred_date >= timedelta(days=check_days):
+                try:
+                    current_price = broker.get_current_price(pred['symbol'])
+                    if current_price:
+                        profit_rate = (current_price - pred['prediction_price']) / pred['prediction_price']
+                        pred['result_price'] = current_price
+                        pred['profit_rate'] = profit_rate
+                        pred['checked_date'] = now.strftime('%Y-%m-%d %H:%M:%S')
+                        
+                        if profit_rate >= threshold:
+                            pred['result'] = 'HIT'
+                        else:
+                            pred['result'] = 'MISS'
+                            
+                        updated_count += 1
+                        logger.info(f"✅ AI 결과 업데이트: {pred['name']} ({pred['result']}) - 수익률: {profit_rate*100:.2f}%")
+                except Exception as e:
+                    logger.error(f"❌ {pred['name']} 결과 업데이트 중 오류: {e}")
+
+        if updated_count > 0:
+            self._save_data()
+            
+        return updated_count
+
+    def get_hit_rate(self) -> float:
+        """
+        현재 적중률 반환 (%, 최근 50건 기준)
+        """
+        # 결과가 나온 것들만 필터링
+        results = [p for p in self.predictions if p['result'] in ['HIT', 'MISS']]
+        recent_results = results[:50] # 최근 50건
+        
+        if not recent_results:
+            return 50.0 # 데이터 없으면 기본값 50%
+            
+        hits = sum(1 for p in recent_results if p['result'] == 'HIT')
+        hit_rate = (hits / len(recent_results)) * 100
+        return round(hit_rate, 1)
+
+    def get_dynamic_min_score(self) -> int:
+        """
+        적중률 기반 동적 최소 AI 점수 반환
+        - 55% 이상 -> 65점
+        - 45~55% -> 70점
+        - 45% 미만 -> 80점
+        """
+        hit_rate = self.get_hit_rate()
+        
+        if hit_rate >= 55:
+            return 65
+        elif hit_rate >= 45:
+            return 70
         else:
-            self.losing_trades += 1
-            is_win = False
-            
-        self.total_trades += 1
-        
-        # 언제, 어떤 종목을, 얼마에 사서 얼마에 팔았는지, 그리고 이겼는지 장부에 기록합니다.
-        trade_record = {
-            "stock_code": stock_code,
-            "buy_price": buy_price,
-            "sell_price": sell_price,
-            "profit_amount": profit_amount,
-            "is_win": is_win
-        }
-        self.trade_history.append(trade_record)
+            return 80
 
-    def calculate_win_rate(self) -> float:
+    def get_dynamic_position_size(self) -> float:
         """
-        지금까지 AI가 추천해서 거래한 결과가 얼마나 성공적이었는지(승률)를 퍼센트(%)로 계산합니다.
+        적중률 기반 동적 투자 비중 반환
+        - 55% 이상 -> 0.12 (12%)
+        - 45~55% -> 0.10 (10%)
+        - 45% 미만 -> 0.07 (7%)
+        """
+        hit_rate = self.get_hit_rate()
         
-        Returns:
-            float: 승리 비율 (예: 60.5)
-        """
-        # 거래한 적이 한 번도 없다면 승률은 0% 입니다.
-        if self.total_trades == 0:
-            return 0.0
-            
-        # (이긴 횟수 / 전체 횟수) * 100 으로 승률을 퍼센트(%)로 계산합니다.
-        # 소수점 둘째 자리까지만 예쁘게 잘라서 보여줍니다 (예: 66.67)
-        win_rate = float((self.winning_trades / self.total_trades) * 100)
-        return round(win_rate, 2)
+        if hit_rate >= 55:
+            return 0.12
+        elif hit_rate >= 45:
+            return 0.10
+        else:
+            return 0.07
 
-    def get_performance_summary(self) -> dict:
-        """
-        총 몇 번 거래해서 몇 번 이겼고, 승률은 얼마나 되는지 종합 성적표를 보여줍니다.
-        (나중에 화면에 출력하거나 로거(logger)에 기록하기 좋습니다.)
+    def get_stats_summary(self) -> str:
+        """텔레그램 리포트용 요약 문자열"""
+        hit_rate = self.get_hit_rate()
+        results = [p for p in self.predictions if p['result'] in ['HIT', 'MISS']]
+        recent_results = results[:50]
+        hits = sum(1 for p in recent_results if p['result'] == 'HIT')
+        total = len(recent_results)
         
-        Returns:
-            dict: 총 거래수, 승, 패, 승률이 담긴 정보 사전(dictionary)
-        """
-        # 종합 성적표(사전 형식)를 만들어서 돌려줍니다.
-        summary = {
-            "총 거래 횟수": self.total_trades,
-            "성공(익절) 횟수": self.winning_trades,
-            "실패(손절) 횟수": self.losing_trades,
-            "현재 승률(%)": self.calculate_win_rate()
-        }
-        return summary
+        status = "⚪ Normal"
+        if hit_rate >= 55: status = "🟢 High"
+        elif hit_rate < 45: status = "🔴 Low"
+        
+        return f"📊 AI 적중률: {hit_rate}% ({hits}/{total}건) - {status}"
