@@ -11,15 +11,20 @@ try:
 except ImportError:
     pass # 실제 환경에 맞게 설치 필요
 
+import sys
+# 프로젝트 최상위 경로(ai_trading_bot)를 sys.path에 추가하여 패키지를 정상적으로 찾도록 함
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
 # 시스템 설정 파일 불러오기
 try:
     import config
     from src.utils.risk_manager import RiskManager
-    from src.utils import logger, ai_hit_tracker
+    from src.utils.ai_hit_tracker import AIHitTracker
+    from src.common_utils import logger, send_telegram_msg
     # 통신 및 API 모듈
     from src.api.koreainvestment import KoreaInvestmentAPI
-    # from src.utils.telegram_bot import send_telegram_msg
-except ImportError:
+except ImportError as e:
+    logging.error(f"필수 모듈 임포트 에러: {e}")
     pass
 
 # 로깅 기본 설정
@@ -114,7 +119,7 @@ class AIQuantManager:
                 time.sleep(2)
         else:
             logging.error("잔고 조회 3회 연속 실패. 시스템을 점검해 주세요.")
-            self.send_telegram_msg("🚨 잔고 조회 실패로 자동매매를 일시 중지합니다.")
+            self.send_telegram_msg("[비상] 잔고 조회 실패로 자동매매를 일시 중지합니다.")
             return False
             
         return True
@@ -161,7 +166,7 @@ class AIQuantManager:
             self.max_today_positions = allowed_positions
             
         logging.info(f"오늘의 트레이딩 모드: {self.trading_mode} (최대 {self.max_today_positions}종목 매수 가능)")
-        self.send_telegram_msg(f"📊 [오늘의 시장 분석]\n모드: {self.trading_mode}\n매수 가능 수: {self.max_today_positions}개")
+        self.send_telegram_msg(f"[오늘의 시장 분석]\n모드: {self.trading_mode}\n매수 가능 수: {self.max_today_positions}개")
 
     def analyze_with_gemini(self, stock_info: Dict) -> Dict:
         """
@@ -282,7 +287,7 @@ class AIQuantManager:
                     }
                     
                     self.cash_balance -= (buy_qty * buy_price)
-                    msg = f"🟢 [신규 매수 성공]\n- 종목: {stock['name']}\n- 체결단가: {buy_price}원\n- 피라미딩 1단계(30%) 완료"
+                    msg = f"[신규 매수 성공]\n- 종목: {stock['name']}\n- 체결단가: {buy_price}원\n- 피라미딩 1단계(30%) 완료"
                     self.send_telegram_msg(msg)
             except Exception as e:
                 logging.error(f"{stock['name']} 매수 주문 실패: {e}")
@@ -349,7 +354,7 @@ class AIQuantManager:
             res = self.kis_api.sell_market_order(code, pos['quantity'])
             
             if res and res.get('rt_cd') == '0':
-                msg = f"🔴 [매도 완료]\n- 종목: {pos['name']}\n- 사유: {reason}"
+                msg = f"[매도 완료]\n- 종목: {pos['name']}\n- 사유: {reason}"
                 self.send_telegram_msg(msg)
                 # 포지션에서 제거
                 del self.positions[code]
@@ -378,7 +383,7 @@ class AIQuantManager:
             pos['avg_price'] = new_avg_price
             pos['pyramid_stage'] = next_stage
             
-            msg = f"🔥 [피라미딩 {next_stage}차 추매]\n- 종목: {pos['name']}\n- 평단가 변경: {new_avg_price:,.0f}원"
+            msg = f"[피라미딩 {next_stage}차 추매]\n- 종목: {pos['name']}\n- 평단가 변경: {new_avg_price:,.0f}원"
             self.send_telegram_msg(msg)
         except Exception as e:
             logging.error(f"{pos['name']} 추매 실패: {e}")
@@ -419,7 +424,7 @@ class AIQuantManager:
         logging.info("Step 6: 일일 리포트 작성 중...")
         
         msg = f"""
-        📋 [AI Quant 일일 마감 리포트]
+        [AI Quant 일일 마감 리포트]
         - 총 자산: {self.total_assets:,.0f} 원
         - 남은 현금: {self.cash_balance:,.0f} 원
         - 보유 주식수: {len(self.positions)} 개
@@ -437,7 +442,7 @@ class AIQuantManager:
         (테스트를 위해 시간 체류 코드는 주석 처리, 로직 흐름만 구성)
         """
         self.is_running = True
-        logging.info("🚀 AI Quant 메인 루프를 시작합니다.")
+        logging.info("AI Quant 메인 루프를 시작합니다.")
         
         try:
             while self.is_running:
@@ -481,7 +486,7 @@ class AIQuantManager:
             self.is_running = False
         except Exception as e:
             logging.error(f"메인 루프 동작 중 치명적 에러 발생: {e}")
-            self.send_telegram_msg("🚨 봇 동작 중 치명적 오류가 발생했습니다. 로그를 확인하세요.")
+            self.send_telegram_msg("[비상] 봇 동작 중 치명적 오류가 발생했습니다. 로그를 확인하세요.")
 
 if __name__ == "__main__":
     manager = AIQuantManager()

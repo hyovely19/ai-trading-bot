@@ -60,12 +60,12 @@ class KoreaInvestmentAPI:
                 self.headers["appkey"] = self.app_key
                 self.headers["appsecret"] = self.app_secret
                 
-                print("✅ 한국투자증권 API 토큰 발급 성공!")
+                print("[성공] 한국투자증권 API 토큰 발급 완료!")
             else:
-                print(f"❌ 토큰 발급 실패: {response.status_code} - {response.text}")
+                print(f"[실패] 토큰 발급 실패: {response.status_code} - {response.text}")
                 
         except Exception as e:
-            print(f"❌ 토큰 발급 중 오류 발생: {e}")
+            print(f"[오류] 토큰 발급 중 오류 발생: {e}")
 
     def get_current_price(self, stock_code: str):
         """
@@ -100,11 +100,11 @@ class KoreaInvestmentAPI:
                 current_price = result['output']['stck_prpr']
                 return int(current_price)
             else:
-                print(f"❌ 현재가 조회 실패: {response.text}")
+                print(f"[실패] 현재가 조회 실패: {response.text}")
                 return None
                 
         except Exception as e:
-            print(f"❌ 현재가 조회 중 오류 발생: {e}")
+            print(f"[오류] 현재가 조회 중 오류 발생: {e}")
             return None
 
     def buy_market_order(self, stock_code: str, quantity: int):
@@ -131,7 +131,7 @@ class KoreaInvestmentAPI:
             response = requests.post(url, headers=headers, data=json.dumps(body))
             return response.json()
         except Exception as e:
-            print(f"❌ 매수 주문 중 오류 발생: {e}")
+            print(f"[오류] 매수 주문 중 오류 발생: {e}")
             return None
 
     def sell_market_order(self, stock_code: str, quantity: int):
@@ -158,7 +158,7 @@ class KoreaInvestmentAPI:
             response = requests.post(url, headers=headers, data=json.dumps(body))
             return response.json()
         except Exception as e:
-            print(f"❌ 매도 주문 중 오류 발생: {e}")
+            print(f"[오류] 매도 주문 중 오류 발생: {e}")
             return None
 
     def get_account_balance(self):
@@ -206,5 +206,5 @@ class KoreaInvestmentAPI:
                 'stocks': stocks
             }
         except Exception as e:
-            print(f"❌ 잔고 조회 중 오류 발생: {e}")
+            print(f"[오류] 잔고 조회 중 오류 발생: {e}")
             return None

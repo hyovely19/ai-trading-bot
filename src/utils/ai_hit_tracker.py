@@ -7,7 +7,7 @@ from typing import List, Dict, Any
 # 프로젝트 최상단 폴더 인식
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 import config
-from src.utils import load_json, save_json, setup_logger
+from src.common_utils import load_json, save_json, setup_logger
 
 # 로거 설정
 logger = setup_logger("AI_HitTracker")

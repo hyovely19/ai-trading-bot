@@ -7,7 +7,7 @@ from typing import Tuple
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 import config
-from src.utils import load_json, save_json, setup_logger
+from src.common_utils import load_json, save_json, setup_logger
 
 class RiskManager:
     """매수 주문 검증(6단계) 및 시스템 보호(서킷브레이커)를 담당하는 경비원 클래스"""

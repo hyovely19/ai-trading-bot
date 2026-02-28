@@ -19,7 +19,7 @@ def ensure_directories():
         if not os.path.exists(dir_path):
             os.makedirs(dir_path)
             # 아직 로거가 설정되기 전일 수 있으므로 print 사용
-            print(f"📁 디렉토리 생성 완료: {dir_path}")
+            print(f"[알림] 디렉토리 생성 완료: {dir_path}")
 
 def setup_logger(name: str):
     """
@@ -55,9 +55,6 @@ def setup_logger(name: str):
     
     return logger
 
-# 전역에서 쓸 글로벌 로거 초기화
-logger = setup_logger("AI_Quant")
-
 def send_telegram_msg(message: str):
     """
     텔레그램 봇으로 메시지를 발송합니다.
@@ -67,7 +64,7 @@ def send_telegram_msg(message: str):
     chat_id = getattr(config, 'TELEGRAM_CHAT_ID', None)
     
     if not token or not chat_id:
-        logger.warning("⚠️ 텔레그램 토큰이나 챗ID가 설정되지 않아 알림을 보낼 수 없습니다.")
+        logger.warning("[Warning] 텔레그램 토큰이나 챗ID가 설정되지 않아 알림을 보낼 수 없습니다.")
         return
         
     url = f"https://api.telegram.org/bot{token}/sendMessage"
@@ -81,7 +78,7 @@ def send_telegram_msg(message: str):
         response = requests.post(url, data=payload, timeout=5)
         response.raise_for_status()
     except Exception as e:
-        logger.error(f"❌ 텔레그램 알림 발송 실패: {e}")
+        logger.error(f"[Error] 텔레그램 알림 발송 실패: {e}")
 
 def save_json(data: dict, filename: str):
     """
@@ -92,29 +89,40 @@ def save_json(data: dict, filename: str):
     base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     filepath = os.path.join(base_dir, 'data', filename)
     
+    # risk_manager 처럼 절대 경로를 그대로 넘기는 경우 처리
+    if os.path.isabs(filename):
+        filepath = filename
+        os.makedirs(os.path.dirname(filepath), exist_ok=True)
+    
     try:
         with open(filepath, 'w', encoding='utf-8') as f:
             json.dump(data, f, ensure_ascii=False, indent=4)
     except Exception as e:
-        logger.error(f"❌ JSON 저장 실패 ({filename}): {e}")
+        logger.error(f"[Error] JSON 저장 실패 ({filepath}): {e}")
 
-def load_json(filename: str):
+def load_json(filename: str, default_val=None):
     """
     data/{filename} 에서 JSON 파일을 읽어옵니다.
-    파일이 없으면 빈 딕셔너리를 반환합니다.
+    파일이 없거나 로드할 수 없으면 default_val (또는 빈 딕셔너리)을 반환합니다.
     """
     base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     filepath = os.path.join(base_dir, 'data', filename)
     
+    # 꼼수: risk_manager.py에서는 data_path 전체 절대 경로를 넘길 수도 있으므로 체크
+    if os.path.isabs(filename):
+        filepath = filename
+    
+    result_default = default_val if default_val is not None else {}
+    
     if not os.path.exists(filepath):
-        return {}
+        return result_default
         
     try:
         with open(filepath, 'r', encoding='utf-8') as f:
             return json.load(f)
     except Exception as e:
-        logger.error(f"❌ JSON 로드 실패 ({filename}): {e}")
-        return {}
+        logger.error(f"[Error] JSON 로드 실패 ({filepath}): {e}")
+        return result_default
 
 def get_today_str() -> str:
     """오늘 날짜를 'YYYY-MM-DD' 형식의 문자열로 반환합니다."""
@@ -149,7 +157,7 @@ def read_recent_logs(lines: int = 20) -> str:
             recent_lines = content[-lines:] if len(content) > lines else content
             return "".join(recent_lines)
     except Exception as e:
-        logger.error(f"❌ 로그 읽기 실패: {e}")
+        logger.error(f"[Error] 로그 읽기 실패: {e}")
         return f"로그를 읽어오는 중 오류가 발생했습니다: {e}"
 
 def update_account_history(total_asset: int, date: str):
@@ -184,4 +192,7 @@ def update_account_history(total_asset: int, date: str):
     # 리스트 형태를 다시 딕셔너리로 감싸서 저장 (정규격)
     save_data = {'history': history_data}
     save_json(save_data, history_file)
-    logger.info(f"📊 일일 자산 내역 저장 완료 ({date}: {total_asset:,}원)")
+    logger.info(f"[알림] 일일 자산 내역 저장 완료 ({date}: {total_asset:,}원)")
+
+# 전역에서 쓸 글로벌 로거 초기화 (함수들이 모두 정의된 후 호출)
+logger = setup_logger("AI_Quant")
