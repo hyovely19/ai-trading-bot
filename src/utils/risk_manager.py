@@ -17,7 +17,6 @@ class RiskManager:
         self.investment_ratio = INVESTMENT_RATIO
         self.stop_loss_rate = STOP_LOSS_RATE
         self.target_profit_rate = TARGET_PROFIT_RATE
-        pass
 
     def check_stop_loss(self, buy_price: float, current_price: float) -> bool:
         """
@@ -30,7 +29,15 @@ class RiskManager:
         Returns:
             bool: 손절 기준까지 떨어졌다면 True(손절 명령), 아니면 False 반환
         """
-        pass
+        if buy_price <= 0: return False
+        
+        # 현재 수익률 계산 (예: 100원에 사서 90원이면 -10%)
+        profit_rate = (current_price - buy_price) / buy_price
+        
+        # 수익률이 설정한 손절선(-0.03 등)보다 더 떨어졌다면 True 반환
+        if profit_rate <= self.stop_loss_rate:
+            return True
+        return False
 
     def check_take_profit(self, buy_price: float, current_price: float) -> bool:
         """
@@ -43,7 +50,15 @@ class RiskManager:
         Returns:
             bool: 목표 이익에 도달했다면 True(익절 명령), 아니면 False 반환
         """
-        pass
+        if buy_price <= 0: return False
+        
+        # 현재 수익률 계산
+        profit_rate = (current_price - buy_price) / buy_price
+        
+        # 수익률이 설정한 목표수익선(+0.05 등)보다 더 올라갔다면 True 반환
+        if profit_rate >= self.target_profit_rate:
+            return True
+        return False
 
     def calculate_order_quantity(self, total_capital: int, current_price: int) -> int:
         """
@@ -57,4 +72,12 @@ class RiskManager:
         Returns:
             int: 구매해도 안전한 주식 주문 수량(몇 개를 살지)
         """
-        pass
+        if current_price <= 0 or total_capital <= 0: return 0
+        
+        # 이번 종목에 투자할 최대 금액 계산 (전체 자산 * 투자비중)
+        available_amount = total_capital * self.investment_ratio
+        
+        # 이 금액으로 살 수 있는 최대 수량 계산 (소수점 버림)
+        max_quantity = int(available_amount // current_price)
+        
+        return max_quantity
