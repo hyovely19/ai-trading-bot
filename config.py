@@ -1,4 +1,10 @@
 import os
+from dotenv import load_dotenv
+
+# config 폴더 안의 .env 파일을 확실하게 로드합니다.
+base_dir = os.path.dirname(os.path.abspath(__file__))
+env_path = os.path.join(base_dir, 'config', '.env')
+load_dotenv(env_path)
 
 # ==========================================
 # 자동매매 시스템 환경 설정 파일 (config.py)
