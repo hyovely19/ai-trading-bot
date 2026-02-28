@@ -1,9 +1,11 @@
 # 보안 정보
 .env
 kis_key.ini
+token.dat
 
 # 파이썬 캐시 파일
 __pycache__/
+*.pyc
 *.py[cod]
 *$py.class
 
@@ -15,3 +17,8 @@ env/
 # 시스템 로그 및 임시 파일
 *.log
 .DS_Store
+
+# 데이터 및 폴더
+data/
+logs/
+reports/
