@@ -16,8 +16,8 @@ try:
     import config
     from src.utils.risk_manager import RiskManager
     from src.utils import logger, ai_hit_tracker
-    # 통신 및 API 모듈 (실제 경로/이름에 맞게 적용)
-    # from src.api.koreainvestment import KoreaInvestment
+    # 통신 및 API 모듈
+    from src.api.koreainvestment import KoreaInvestmentAPI
     # from src.utils.telegram_bot import send_telegram_msg
 except ImportError:
     pass
@@ -35,13 +35,13 @@ class AIQuantManager:
         """시스템 운영에 필요한 기본 설정 및 상태 변수를 초기화합니다."""
         logging.info("AI Quant Manager 초기화 시작")
         
-        # API 클라이언트 초기화 (가상)
-        self.kis_api = None # KoreaInvestment(api_key=config.KIS_APP_KEY, api_secret=config.KIS_APP_SECRET, acc_no=config.KIS_ACCOUNT_NO)
-        self.risk_manager = None # RiskManager()
+        # API 클라이언트 초기화
+        self.kis_api = KoreaInvestmentAPI()
+        self.risk_manager = RiskManager() if 'RiskManager' in globals() else None
         
         # 포지션(보유 종목) 데이터 구조
         # key: 종목코드, value: dict(name, quantity, avg_price, stop_loss, target_price, pyramid_stage, highest_price, consecutive_down_days)
-        self.positions: Dict[str, Dict[str, Any]] = {}
+        self.positions: Dict[str, Any] = {}
         
         # 당일 트레이딩 모드 (AGGRESSIVE, MODERATE, DEFENSIVE)
         self.trading_mode = "AGGRESSIVE"
@@ -79,27 +79,36 @@ class AIQuantManager:
         """
         logging.info("Step 0: 초기화 진행 중...")
         
-        # 1. API 토큰 재발급 로직 (가상)
-        # self.kis_api.issue_token()
+        # 1. API 토큰 재발급 로직
+        self.kis_api.get_access_token()
         
         # 2. 거래일 확인 (주말 체크)
         today = datetime.datetime.now()
         if today.weekday() >= 5: # 토=5, 일=6
             logging.info("오늘은 주말(휴장일)입니다. 다음 거래일까지 대기합니다.")
-            # 실제 루프에서는 대기 상태로 전환
             return False
             
-        # 3. 잔고 조회 및 포지션 동기화 (가상)
-        # 3회 재시도 로직 포함 필요
+        # 3. 잔고 조회 및 포지션 동기화
         for _ in range(3):
             try:
-                # balance_data = self.kis_api.fetch_balance()
-                # self.cash_balance = balance_data['cash']
-                # self.total_assets = balance_data['total']
-                # self.sync_positions(balance_data['stocks'])
-                self.cash_balance = config.TOTAL_CAPITAL # 테스트용
-                self.total_assets = config.TOTAL_CAPITAL
-                break
+                balance_data = self.kis_api.get_account_balance()
+                if balance_data:
+                    self.cash_balance = balance_data['cash']
+                    self.total_assets = balance_data['total']
+                    # 포지션 동기화
+                    self.positions = {}
+                    for s in balance_data['stocks']:
+                        self.positions[s['code']] = {
+                            "name": s['name'],
+                            "quantity": s['qty'],
+                            "avg_price": s['avg_price'],
+                            "stop_loss": s['avg_price'] * (1 + config.STOP_LOSS_RATE),
+                            "target_price": s['avg_price'] * (1 + config.TAKE_PROFIT_FULL),
+                            "pyramid_stage": 1,
+                            "highest_price": s['avg_price'],
+                            "consecutive_down_days": 0
+                        }
+                    break
             except Exception as e:
                 logging.warning(f"잔고 조회 실패 (재시도 중..): {e}")
                 time.sleep(2)
@@ -247,14 +256,19 @@ class AIQuantManager:
             
             # 피라미딩 1단계 비중(30%)로 투입 금액 계산
             invest_amount = (config.TOTAL_CAPITAL * config.MAX_PER_STOCK_RATIO) * config.PYRAMID_STAGE_1
+            current_price = self.kis_api.get_current_price(code) or 1 # 수량 계산을 위한 현재가
+            buy_qty = int(invest_amount / current_price) if current_price > 0 else 0
+            
+            if buy_qty <= 0: continue
             
             try:
-                # 3회 재시도 (가상 API 호출)
-                success = True
-                buy_qty = 10 # 계산된 수량
-                buy_price = 80000 # 실제 체결가 또는 매수가
+                # 실제 KIS API 매수 주문 호출 (시장가)
+                res = self.kis_api.buy_market_order(code, buy_qty)
                 
-                if success:
+                if res and res.get('rt_cd') == '0':
+                    buy_price = float(res.get('output', {}).get('ord_unpr', 0)) or 0 # 실제 체결가는 나중에 확인 필요할 수 있음
+                    # 임시로 현재가 등으로 보정하거나 응답값 활용
+                    buy_price = buy_price if buy_price > 0 else 0 # (실제 구현에선 체결 조회 API 필요)
                     # 포지션 등록
                     self.positions[code] = {
                         "name": stock['name'],
@@ -285,8 +299,9 @@ class AIQuantManager:
         for code in list(self.positions.keys()):
             pos = self.positions[code]
             
-            # 현재가 조회 (가상)
-            current_price = pos['avg_price'] * 1.05 # 테스트용 5% 수익 상태라고 가정
+            # 현재가 조회 (실제 KIS API 호출)
+            current_price = self.kis_api.get_current_price(code)
+            if not current_price: continue
             
             # 최고가 업데이트 (트레일링 스탑 용)
             if current_price > pos['highest_price']:
@@ -330,15 +345,16 @@ class AIQuantManager:
         """내부 유틸: 특정 종목 전량 매도 수행"""
         pos = self.positions[code]
         try:
-            # 매도 API 호출 공간 (가상)
-            sell_amount = pos['quantity'] * sell_price
-            self.cash_balance += sell_amount
+            # 실제 KIS API 매도 주문 호출
+            res = self.kis_api.sell_market_order(code, pos['quantity'])
             
-            msg = f"🔴 [매도 완료]\n- 종목: {pos['name']}\n- 매도단가: {sell_price:,.0f}원\n- 사유: {reason}"
-            self.send_telegram_msg(msg)
-            
-            # 포지션에서 제거
-            del self.positions[code]
+            if res and res.get('rt_cd') == '0':
+                msg = f"🔴 [매도 완료]\n- 종목: {pos['name']}\n- 사유: {reason}"
+                self.send_telegram_msg(msg)
+                # 포지션에서 제거
+                del self.positions[code]
+            else:
+                logging.error(f"{pos['name']} 매도 주문 거부: {res.get('msg1')}")
         except Exception as e:
             logging.error(f"{pos['name']} 매도 실패: {e}")
 

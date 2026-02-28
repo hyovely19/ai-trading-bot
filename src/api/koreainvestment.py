@@ -110,25 +110,101 @@ class KoreaInvestmentAPI:
     def buy_market_order(self, stock_code: str, quantity: int):
         """
         지정한 종목을 현재 시장 가격(시장가)으로 매수(살 때)하는 주문을 넣습니다.
-        
-        Args:
-            stock_code (str): 매수할 종목코드
-            quantity (int): 매수할 수량
         """
-        pass
+        if not self.access_token: return None
+        url = f"{self.url_base}/uapi/domestic-stock/v1/trading/order-cash"
+        
+        headers = self.headers.copy()
+        # 'TTTC0802U'는 현금 매수 주문을 의미합니다. (모의투자의 경우 앞에 'V'가 붙기도 함)
+        headers["tr_id"] = "TTTC0802U" if os.getenv("URL_BASE", "").find("openapi") >= 0 else "VTTC0802U"
+        
+        body = {
+            "CANO": self.account_no,
+            "ACNT_PRDT_CD": self.product_code,
+            "PDNO": stock_code,
+            "ORD_DVSN": "01", # 01: 시장가
+            "ORD_QTY": str(quantity),
+            "ORD_UNPR": "0" # 시장가는 단가 0
+        }
+        
+        try:
+            response = requests.post(url, headers=headers, data=json.dumps(body))
+            return response.json()
+        except Exception as e:
+            print(f"❌ 매수 주문 중 오류 발생: {e}")
+            return None
 
     def sell_market_order(self, stock_code: str, quantity: int):
         """
         지정한 종목을 현재 시장 가격으로 매도(팔 때)하는 주문을 넣습니다.
-        
-        Args:
-            stock_code (str): 매도할 종목코드
-            quantity (int): 매도할 수량
         """
-        pass
+        if not self.access_token: return None
+        url = f"{self.url_base}/uapi/domestic-stock/v1/trading/order-cash"
+        
+        headers = self.headers.copy()
+        # 'TTTC0801U'는 현금 매도 주문을 의미합니다.
+        headers["tr_id"] = "TTTC0801U" if os.getenv("URL_BASE", "").find("openapi") >= 0 else "VTTC0801U"
+        
+        body = {
+            "CANO": self.account_no,
+            "ACNT_PRDT_CD": self.product_code,
+            "PDNO": stock_code,
+            "ORD_DVSN": "01", # 01: 시장가
+            "ORD_QTY": str(quantity),
+            "ORD_UNPR": "0"
+        }
+        
+        try:
+            response = requests.post(url, headers=headers, data=json.dumps(body))
+            return response.json()
+        except Exception as e:
+            print(f"❌ 매도 주문 중 오류 발생: {e}")
+            return None
 
     def get_account_balance(self):
         """
         현재 내 계좌의 잔고(보유 예수금 및 주식)를 조회합니다.
         """
-        pass
+        if not self.access_token: return None
+        url = f"{self.url_base}/uapi/domestic-stock/v1/trading/inquire-balance"
+        
+        headers = self.headers.copy()
+        headers["tr_id"] = "TTTC8434R" if os.getenv("URL_BASE", "").find("openapi") >= 0 else "VTTC8434R"
+        
+        params = {
+            "CANO": self.account_no,
+            "ACNT_PRDT_CD": self.product_code,
+            "AFHR_FLPR_YN": "N",
+            "OFRT_WTHR_YN": "N",
+            "INQR_DVSN": "01",
+            "UNPR_DVSN": "01",
+            "FUND_STTL_ICLD_YN": "N",
+            "FNCG_AMT_AUTO_RDPT_YN": "N",
+            "PRCS_DVSN": "01",
+            "CTX_AREA_FK100": "",
+            "CTX_AREA_NK100": ""
+        }
+        
+        try:
+            response = requests.get(url, headers=headers, params=params)
+            res_data = response.json()
+            
+            # 메인 엔진에서 사용하기 좋게 데이터 정제
+            stocks = []
+            for item in res_data.get('output1', []):
+                if int(item['hldg_qty']) > 0:
+                    stocks.append({
+                        'code': item['pdno'],
+                        'name': item['prdt_name'],
+                        'qty': int(item['hldg_qty']),
+                        'avg_price': float(item['pchs_avg_pric'])
+                    })
+            
+            return {
+                'cash': float(res_data.get('output2', [{}])[0].get('dnca_tot_amt', 0)),
+                'total': float(res_data.get('output2', [{}])[0].get('tot_evlu_amt', 0)),
+                'stocks': stocks
+            }
+        except Exception as e:
+            print(f"❌ 잔고 조회 중 오류 발생: {e}")
+            return None
