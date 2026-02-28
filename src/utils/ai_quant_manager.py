@@ -143,7 +143,7 @@ class AIQuantManager:
         allowed_positions = config.MAX_POSITIONS
         
         # VIX 기준 (MODERATE 조건 우선)
-        if 20 <= vix < 30:
+        if config.VIX_CLOUDY_THRESHOLD <= vix < config.VIX_STORMY_THRESHOLD:
             new_mode = "MODERATE"
             allowed_positions = min(5, config.MAX_POSITIONS)
             
@@ -154,7 +154,7 @@ class AIQuantManager:
                 allowed_positions = min(5, config.MAX_POSITIONS)
 
         # 절대 방어(DEFENSIVE) 기준
-        if vix >= 30 or nasdaq_change <= -2.0 or exchange_rate_change >= 2.0 or abs(oil_change) >= 7.0:
+        if vix >= config.VIX_STORMY_THRESHOLD or nasdaq_change <= -2.0 or exchange_rate_change >= 2.0 or abs(oil_change) >= 7.0:
             new_mode = "DEFENSIVE"
             allowed_positions = 0
             
