@@ -60,8 +60,8 @@ def send_telegram_msg(message: str):
     텔레그램 봇으로 메시지를 발송합니다.
     (오류 시 무한루프 방지를 위해 에러만 띄우고 넘어감)
     """
-    token = getattr(config, 'TELEGRAM_TOKEN', None)
-    chat_id = getattr(config, 'TELEGRAM_CHAT_ID', None)
+    token = getattr(config, 'TELEGRAM_TOKEN', None) or os.environ.get('TELEGRAM_TOKEN')
+    chat_id = getattr(config, 'TELEGRAM_CHAT_ID', None) or os.environ.get('TELEGRAM_CHAT_ID')
     
     if not token or not chat_id:
         logger.warning("[Warning] 텔레그램 토큰이나 챗ID가 설정되지 않아 알림을 보낼 수 없습니다.")
