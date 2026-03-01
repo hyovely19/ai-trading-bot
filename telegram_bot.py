@@ -102,6 +102,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """지정되지 않은 일반 메시지를 AI 비서처럼 답변"""
     user_text = update.message.text
     
+    # 자연어 명령어 맵핑 (한국어로 자연스럽게 물어봐도 동작하도록)
+    if any(keyword in user_text for keyword in ["잔고", "자산", "얼마", "계좌"]):
+        await balance_command(update, context)
+        return
+        
     # Gemini API 키 확인
     api_key = getattr(config, 'GEMINI_API_KEY', None)
     if not api_key or not genai:
