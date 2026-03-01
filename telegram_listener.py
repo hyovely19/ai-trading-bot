@@ -70,7 +70,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Gemini API 키 확인
     api_key = getattr(config, 'GEMINI_API_KEY', None)
     if not api_key or not genai:
-        msg = "죄송합니다. 현재 AI(Gemini) 기능이 연결되어 있지 않아 정해진 명령어만 수행할 수 있습니다. /help 를 참고해주세요."
+        reason = f"KEY:{'O' if api_key else 'X'}, GENAI:{'O' if genai else 'X'}"
+        msg = f"죄송합니다. 현재 설정 문제({reason})로 인해 정해진 명령어만 수행할 수 있습니다. /help 를 참고해주세요."
         await context.bot.send_message(chat_id=update.effective_chat.id, text=msg)
         return
 
