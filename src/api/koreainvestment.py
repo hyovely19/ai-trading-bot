@@ -194,17 +194,24 @@ class KoreaInvestmentAPI:
             # 메인 엔진에서 사용하기 좋게 데이터 정제
             stocks = []
             for item in res_data.get('output1', []):
-                if int(item['hldg_qty']) > 0:
+                if int(item.get('hldg_qty', 0)) > 0:
                     stocks.append({
-                        'code': item['pdno'],
-                        'name': item['prdt_name'],
-                        'qty': int(item['hldg_qty']),
-                        'avg_price': float(item['pchs_avg_pric'])
+                        'code': item.get('pdno', ''),
+                        'name': item.get('prdt_name', ''),
+                        'qty': int(item.get('hldg_qty', 0)),
+                        'avg_price': float(item.get('pchs_avg_pric', 0))
                     })
             
+            output2 = res_data.get('output2', [])
+            cash = 0.0
+            total = 0.0
+            if output2 and len(output2) > 0:
+                cash = float(output2[0].get('dnca_tot_amt', 0))
+                total = float(output2[0].get('tot_evlu_amt', 0))
+
             return {
-                'cash': float(res_data.get('output2', [{}])[0].get('dnca_tot_amt', 0)),
-                'total': float(res_data.get('output2', [{}])[0].get('tot_evlu_amt', 0)),
+                'cash': cash,
+                'total': total,
                 'stocks': stocks
             }
         except Exception as e:
