@@ -61,13 +61,11 @@ class AIQuantManager:
 
     def send_telegram_msg(self, message: str):
         """
-        텔레그램 알림 발송 함수 (가상 구현)
-        실제 환경에서는 utils.py 의 send_telegram_msg() 등을 호출해야 합니다.
+        텔레그램 알림 발송 함수 (가상 구현 없음 - 실제 발송)
         """
         logging.info(f"텔레그램 알림 발송: {message}")
         try:
-            # send_telegram_msg(message)
-            pass
+            send_telegram_msg(message)
         except Exception as e:
             logging.error(f"텔레그램 발송 실패: {e}")
 
@@ -91,6 +89,7 @@ class AIQuantManager:
         today = datetime.datetime.now()
         if today.weekday() >= 5: # 토=5, 일=6
             logging.info("오늘은 주말(휴장일)입니다. 다음 거래일까지 대기합니다.")
+            self.send_telegram_msg("💤 [안내] 오늘은 주말(휴장일)입니다. 다음 거래일까지 대기합니다.")
             return False
             
         # 3. 잔고 조회 및 포지션 동기화

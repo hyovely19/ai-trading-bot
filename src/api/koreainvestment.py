@@ -4,8 +4,10 @@ import json
 import os
 from dotenv import load_dotenv
 
-# 환경설정 파일(.env)을 불러옵니다.
-load_dotenv()
+# config 폴더 안의 .env 파일을 찾아 로드합니다.
+base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+env_path = os.path.join(base_dir, 'config', '.env')
+load_dotenv(env_path)
 
 class KoreaInvestmentAPI:
     """한국투자증권 OPEN API 통신 클래스"""
