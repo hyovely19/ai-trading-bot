@@ -63,6 +63,41 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     await context.bot.send_message(chat_id=update.effective_chat.id, text=help_msg, parse_mode='Markdown')
 
+async def balance_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """/balance 명령어 입력시 현재 주식 및 현금 잔고 출력"""
+    await context.bot.send_chat_action(chat_id=update.effective_chat.id, action='typing')
+    
+    try:
+        from src.api.koreainvestment import KoreaInvestmentAPI
+        api = KoreaInvestmentAPI()
+        api.get_access_token()
+        balance_data = api.get_account_balance()
+        
+        if not balance_data:
+            await context.bot.send_message(chat_id=update.effective_chat.id, text="⚠️ 잔고 정보를 불러오는데 실패했습니다.")
+            return
+            
+        cash = balance_data.get('cash', 0)
+        total = balance_data.get('total', 0)
+        stocks = balance_data.get('stocks', [])
+        
+        msg = f"💰 *[현재 계좌 잔고]*\n\n"
+        msg += f"💵 *주문 가능 현금:* {cash:,.0f} 원\n"
+        msg += f"🏦 *총 평가 금액:* {total:,.0f} 원\n\n"
+        
+        if stocks:
+            msg += "📊 *[보유 종목]*\n"
+            for s in stocks:
+                msg += f"• {s['name']} : {s['qty']}주 (평단가 {s['avg_price']:,.0f}원)\n"
+        else:
+            msg += "텅~ 현재 보유 중인 주식이 없습니다."
+            
+        await context.bot.send_message(chat_id=update.effective_chat.id, text=msg, parse_mode='Markdown')
+        
+    except Exception as e:
+        logging.error(f"잔고 조회 중 에러: {e}")
+        await context.bot.send_message(chat_id=update.effective_chat.id, text=f"⚠️ 잔고 조회 중 에러가 발생했습니다: {e}")
+
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """지정되지 않은 일반 메시지를 AI 비서처럼 답변"""
     user_text = update.message.text
@@ -116,6 +151,7 @@ def run_telegram_bot():
     app.add_handler(CommandHandler("start", start_command))
     app.add_handler(CommandHandler("status", status_command))
     app.add_handler(CommandHandler("logs", logs_command))
+    app.add_handler(CommandHandler("balance", balance_command))
     app.add_handler(CommandHandler("help", help_command))
 
     # 일반 메시지 핸들러 등록 (텍스트일 경우)
