@@ -15,13 +15,20 @@ class KoreaInvestmentAPI:
     def __init__(self):
         """
         API 키와 필요한 정보들을 초기화합니다.
-        .env 파일에서 보안 정보들을 읽어옵니다.
+        .env 파일이나 config에서 보안 정보들을 읽어옵니다.
         """
-        self.app_key = os.getenv("APP_KEY")
-        self.app_secret = os.getenv("APP_SECRET")
-        self.url_base = os.getenv("URL_BASE")
-        self.account_no = os.getenv("CANO")
-        self.product_code = os.getenv("ACNT_PRDT_CD")
+        import sys
+        if base_dir not in sys.path:
+            sys.path.append(base_dir)
+        import config
+        
+        self.app_key = config.KIS_APP_KEY or os.getenv("APP_KEY")
+        self.app_secret = config.KIS_APP_SECRET or os.getenv("APP_SECRET")
+        self.url_base = os.getenv("URL_BASE", "https://openapivts.koreainvestment.com:29443")
+        
+        cano = config.KIS_ACCOUNT_NO or os.getenv("CANO")
+        self.account_no = cano.replace('-', '') if cano else ""
+        self.product_code = os.getenv("ACNT_PRDT_CD", "01")
         
         # API 통신에 필요한 인증 토큰 (초기에는 None)
         self.access_token = None
@@ -38,7 +45,25 @@ class KoreaInvestmentAPI:
         API를 사용하기 위한 접근 권한(토큰)을 발급받습니다.
         kis_sample 코드의 auth() 함수를 참고하여 작성되었습니다.
         """
-        # 토큰 발급을 위한 주소 설정
+        import time
+        token_file = os.path.join(base_dir, 'config', 'kis_token.json')
+        
+        # 1. 저장된 기발급 토큰이 있는지 확인 (유효기간 20시간(72000초) 이내면 바로 재사용)
+        if os.path.exists(token_file):
+            try:
+                with open(token_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    if time.time() - data.get('timestamp', 0) < 72000:
+                        self.access_token = data.get('access_token')
+                        self.headers["authorization"] = f"Bearer {self.access_token}"
+                        self.headers["appkey"] = self.app_key
+                        self.headers["appsecret"] = self.app_secret
+                        print("[안내] 기존에 발급받은 KIS API 토큰을 파일에서 불러와 재사용합니다.")
+                        return
+            except Exception as e:
+                print(f"[오류] 기존 토큰 파일 읽기 실패: {e}")
+
+        # 2. 토큰을 새로 발급받기 위한 주소 설정
         url = f"{self.url_base}/oauth2/tokenP"
         
         # 토큰을 달라고 요청할 때 보내야 하는 데이터
@@ -62,7 +87,17 @@ class KoreaInvestmentAPI:
                 self.headers["appkey"] = self.app_key
                 self.headers["appsecret"] = self.app_secret
                 
-                print("[성공] 한국투자증권 API 토큰 발급 완료!")
+                # 3. 새로 발급받은 토큰을 다음번 재사용을 위해 파일에 저장해둡니다.
+                try:
+                    with open(token_file, 'w', encoding='utf-8') as f:
+                        json.dump({
+                            'access_token': self.access_token,
+                            'timestamp': time.time()
+                        }, f, ensure_ascii=False, indent=4)
+                except Exception as e:
+                    print(f"[오류] 새 토큰 파일 저장 실패: {e}")
+                
+                print("[성공] 한국투자증권 API 토큰 발급 완료 (새로 발급됨)!")
             else:
                 print(f"[실패] 토큰 발급 실패: {response.status_code} - {response.text}")
                 
@@ -118,7 +153,7 @@ class KoreaInvestmentAPI:
         
         headers = self.headers.copy()
         # 'TTTC0802U'는 현금 매수 주문을 의미합니다. (모의투자의 경우 앞에 'V'가 붙기도 함)
-        headers["tr_id"] = "TTTC0802U" if os.getenv("URL_BASE", "").find("openapi") >= 0 else "VTTC0802U"
+        headers["tr_id"] = "VTTC0802U" if "vts" in str(self.url_base).lower() else "TTTC0802U"
         
         body = {
             "CANO": self.account_no,
@@ -145,7 +180,7 @@ class KoreaInvestmentAPI:
         
         headers = self.headers.copy()
         # 'TTTC0801U'는 현금 매도 주문을 의미합니다.
-        headers["tr_id"] = "TTTC0801U" if os.getenv("URL_BASE", "").find("openapi") >= 0 else "VTTC0801U"
+        headers["tr_id"] = "VTTC0801U" if "vts" in str(self.url_base).lower() else "TTTC0801U"
         
         body = {
             "CANO": self.account_no,
@@ -171,7 +206,7 @@ class KoreaInvestmentAPI:
         url = f"{self.url_base}/uapi/domestic-stock/v1/trading/inquire-balance"
         
         headers = self.headers.copy()
-        headers["tr_id"] = "TTTC8434R" if os.getenv("URL_BASE", "").find("openapi") >= 0 else "VTTC8434R"
+        headers["tr_id"] = "VTTC8434R" if "vts" in str(self.url_base).lower() else "TTTC8434R"
         
         params = {
             "CANO": self.account_no,
@@ -184,7 +219,8 @@ class KoreaInvestmentAPI:
             "FNCG_AMT_AUTO_RDPT_YN": "N",
             "PRCS_DVSN": "01",
             "CTX_AREA_FK100": "",
-            "CTX_AREA_NK100": ""
+            "CTX_AREA_NK100": "",
+            "OFL_YN": ""
         }
         
         try:
