@@ -2,10 +2,8 @@ import os
 import sys
 import logging
 import asyncio
-import logging
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
-from dotenv import load_dotenv
 
 try:
     from google import genai

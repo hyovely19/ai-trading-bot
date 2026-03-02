@@ -1,7 +1,5 @@
 ﻿import asyncio
-import logging
 import sys
-import os
 
 sys.path.append('.')
 from telegram_bot import handle_message, balance_command

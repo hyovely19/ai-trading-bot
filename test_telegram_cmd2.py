@@ -2,7 +2,6 @@
 
 async def run_test():
     from telegram_bot import handle_message, balance_command
-    import telegram
 
     class MockBot:
         async def send_chat_action(self, chat_id, action):

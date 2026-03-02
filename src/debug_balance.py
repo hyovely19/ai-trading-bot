@@ -1,6 +1,4 @@
 import sys
-import os
-import json
 import requests
 
 base_dir = r"c:\Users\sunny\Desktop\bootcamp_test\ai_trading_bot"

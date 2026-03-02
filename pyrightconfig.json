@@ -1,0 +1,10 @@
+{
+    "extraPaths": [
+        "."
+    ],
+    "typeCheckingMode": "off",
+    "reportOptionalMemberAccess": "none",
+    "reportOptionalSubscript": "none",
+    "reportArgumentType": "none",
+    "reportOperatorIssue": "none"
+}
