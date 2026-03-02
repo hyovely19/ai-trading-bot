@@ -1,6 +1,9 @@
 ﻿import asyncio
 import sys
 
+# Windows에서 이모지 출력 시 cp949 인코딩 에러 방지
+sys.stdout.reconfigure(encoding='utf-8')
+
 sys.path.append('.')
 from telegram_bot import handle_message, balance_command
 
