@@ -208,8 +208,8 @@ def run_telegram_bot():
 
     logging.info("텔레그램 봇 리스너가 시작되었습니다. 메시지 수신 대기 중...")
     
-    # 메시지 수신 무한 대기 (Polling)
-    app.run_polling()
+    # 메시지 수신 무한 대기 (Polling) - 별도 스레드에서 실행되므로 시그널 핸들러 미사용 옵션 추가(Railway 등에서 오류 방지)
+    app.run_polling(drop_pending_updates=True, stop_signals=None)
 
 if __name__ == '__main__':
     try:
