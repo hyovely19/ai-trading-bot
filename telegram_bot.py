@@ -72,14 +72,18 @@ async def balance_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         balance_data = api.get_account_balance()
         
         if not balance_data:
-            await context.bot.send_message(chat_id=update.effective_chat.id, text="⚠️ 잔고 정보를 불러오는데 실패했습니다.")
+            await context.bot.send_message(chat_id=update.effective_chat.id, text="⚠️ 봇 시스템 오류로 잔고 정보를 불러오는데 실패했습니다.")
+            return
+            
+        if 'error' in balance_data:
+            await context.bot.send_message(chat_id=update.effective_chat.id, text=f"⚠️ 증권사 API 통신 거절: {balance_data['error']}\n\n(클라우드 서버나 해외 IP에서 접속하여 차단되었을 확률이 매우 높습니다. Railway 서버를 정지해주세요.)")
             return
             
         cash = balance_data.get('cash', 0)
         total = balance_data.get('total', 0)
         stocks = balance_data.get('stocks', [])
         
-        msg = f"💰 *[현재 계좌 잔고]*\n\n"
+        msg = f"💰 *[현재 계좌 잔고 (로컬 정상 연결)]*\n\n"
         msg += f"💵 *주문 가능 현금:* {cash:,.0f} 원\n"
         msg += f"🏦 *총 평가 금액:* {total:,.0f} 원\n\n"
         

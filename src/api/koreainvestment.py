@@ -226,10 +226,10 @@ class KoreaInvestmentAPI:
         try:
             response = requests.get(url, headers=headers, params=params)
             res_data = response.json()
-            
             if res_data.get('rt_cd') != '0':
-                print(f"[오류] 잔고 조회 API 에러: {res_data.get('msg1')}")
-                return None
+                error_msg = res_data.get('msg1', '알 수 없는 에러')
+                print(f"[오류] 잔고 조회 API 에러: {error_msg}")
+                return {'error': error_msg}
                 
             # 메인 엔진에서 사용하기 좋게 데이터 정제
             stocks = []
