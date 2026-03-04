@@ -286,19 +286,15 @@ class AIQuantManager:
                         "consecutive_down_days": 0
                     }
                     
-                    # API로 최신 잔고 동기화 (체결 시간차 고려하여 1초 대기)
-                    time.sleep(1)
-                    balance_data = self.kis_api.get_account_balance()
-                    if balance_data:
-                        self.cash_balance = balance_data['cash']
-                        self.total_assets = balance_data['total']
-                    else:
-                        self.cash_balance -= (buy_qty * buy_price)
+                    # 모의투자 API 지연(버그)으로 인해 잔고가 즉시 업데이트되지 않는 현상을 방지하고자 로컬 변수 우선 차감
+                    deducted_amount = buy_qty * buy_price
+                    if self.cash_balance >= deducted_amount:
+                        self.cash_balance -= deducted_amount
                         
-                    msg = f"[신규 매수 성공]\n- 종목: {stock['name']}\n- 체결단가: {buy_price:,.0f}원\n- 피라미딩 1단계(30%) 완료\n💵 체결 후 주문 가능 현금: {self.cash_balance:,.0f}원"
+                    msg = f"[신규 매수 성공]\n- 종목: {stock['name']}\n- 매수 수량: {buy_qty}주\n- 체결단가: {buy_price:,.0f}원\n- 피라미딩 1단계(30%) 완료\n💵 체결 후 주문 가능 현금: {self.cash_balance:,.0f}원\n(※ 증권사 시스템 지연 시 /balance 명령어에 늦게 반영될 수 있습니다.)"
                     self.send_telegram_msg(msg)
             except Exception as e:
-                logging.error(f"{stock['name']} 매수 주문 실패: {e}")
+                logging.error(f"{stock['name']} 신규 매수 중 스크립트 내부 에러 발생: {e}")
 
     def step_4_monitor_and_manage(self):
         """
@@ -398,23 +394,19 @@ class AIQuantManager:
                 new_qty = pos['quantity'] + add_qty
                 new_avg_price = total_value / new_qty
             
-            # API로 최신 잔고 동기화 (체결 시간차 고려하여 1초 대기)
-            time.sleep(1)
-            balance_data = self.kis_api.get_account_balance()
-            if balance_data:
-                self.cash_balance = balance_data['cash']
-                self.total_assets = balance_data['total']
-            else:
-                self.cash_balance -= (current_price * add_qty)
+            # 모의투자 API 지연(버그)으로 인해 잔고가 즉시 업데이트되지 않는 현상을 방지하고자 로컬 변수 우선 차감
+            deducted_amount = buy_price * add_qty
+            if self.cash_balance >= deducted_amount:
+                self.cash_balance -= deducted_amount
                 
             pos['quantity'] = new_qty
             pos['avg_price'] = new_avg_price
             pos['pyramid_stage'] = next_stage
             
-            msg = f"[피라미딩 {next_stage}차 추매]\n- 종목: {pos['name']}\n- 평단가 변경: {new_avg_price:,.0f}원\n💵 체결 후 주문 가능 현금: {self.cash_balance:,.0f}원"
+            msg = f"[피라미딩 {next_stage}차 추매 성공]\n- 종목: {pos['name']}\n- 추가 매수: {add_qty}주 (현재 총 {new_qty}주 보유)\n- 평단가 변경: {new_avg_price:,.0f}원\n💵 체결 후 주문 가능 현금: {self.cash_balance:,.0f}원\n(※ 증권사 시스템 지연 시 /balance 명령어에 늦게 반영될 수 있습니다.)"
             self.send_telegram_msg(msg)
         except Exception as e:
-            logging.error(f"{pos['name']} 추매 실패: {e}")
+            logging.error(f"{pos['name']} 추매 중 스크립트 내부 에러 발생: {e}")
 
     def step_5_closing_strategy(self):
         """
