@@ -58,6 +58,7 @@ class AIQuantManager:
         self.total_assets = 0.0
         self.cash_balance = 0.0
         self.is_running = False
+        self.selected_stocks = []
 
     def send_telegram_msg(self, message: str):
         """
@@ -438,47 +439,93 @@ class AIQuantManager:
     def run_daily_loop(self):
         """
         무한 루프로 7단계 루틴을 시간에 맞춰 실행하는 메인 엔진 루프입니다.
-        (테스트를 위해 시간 체류 코드는 주석 처리, 로직 흐름만 구성)
+        실제 서버 환경에 맞게 현재 시각을 확인하며 동작합니다.
         """
         self.is_running = True
         logging.info("AI Quant 메인 루프를 시작합니다.")
         
+        # 오늘 하루 스텝 진행 여부를 기록하는 플래그
+        step_done = {
+            "init": False,
+            "macro": False,
+            "select": False,
+            "buy": False,
+            "close": False,
+            "report": False
+        }
+        
+        last_date = datetime.datetime.now().date()
+        
         try:
             while self.is_running:
-                # -----------------------------
-                # 실전에서는 datetime.now()를 체크하여 
-                # 각 시각에 도달하면 동작. 
-                # 여기서는 테스트용으로 순차 실행.
-                # -----------------------------
+                now = datetime.datetime.now()
                 
-                # Step 0: 08:20 이전 (초기화)
-                is_ready = self.step_0_initialize()
+                # 날짜가 바뀌면 스텝 플래그 초기화
+                if now.date() != last_date:
+                    step_done = {k: False for k in step_done}
+                    last_date = now.date()
+                    
+                # 시간(시, 분) 추출
+                hour = now.hour
+                minute = now.minute
+                time_val = hour * 100 + minute
                 
-                if is_ready:
-                    # Step 1: 08:20 (거시경제 파악)
+                # 토/일요일 패스
+                if now.weekday() >= 5:
+                    time.sleep(3600)
+                    continue
+
+                # Step 0: 08:20 경과 & 미실행 시 (초기화)
+                if time_val >= 820 and not step_done["init"]:
+                    is_ready = self.step_0_initialize()
+                    step_done["init"] = True
+                    if not is_ready:
+                        # 오늘 하루 더이상 진행하지 않도록 임시 플래그 처리
+                        step_done = {k: True for k in step_done}
+                    continue
+
+                # Step 1: 08:22 경과 & 미실행 시 (거시경제 파악)
+                if time_val >= 822 and not step_done["macro"] and step_done["init"]:
                     self.step_1_macro_analysis()
+                    step_done["macro"] = True
+                    continue
                     
-                    # Step 2: 08:30 (종목 AI 분석)
-                    selected_stocks = self.step_2_select_stocks()
+                # Step 2: 08:30 경과 & 미실행 시 (종목 AI 분석)
+                if time_val >= 830 and not step_done["select"] and step_done["macro"]:
+                    self.selected_stocks = self.step_2_select_stocks()
+                    step_done["select"] = True
+                    continue
                     
-                    # Step 3: 09:00 (신규 매수 실행)
-                    self.step_3_execute_buy(selected_stocks)
+                # Step 3: 09:00 경과 & 장 시작 직후 (신규 매수 실행)
+                if time_val >= 900 and not step_done["buy"] and step_done["select"]:
+                    self.step_3_execute_buy(getattr(self, 'selected_stocks', []))
+                    step_done["buy"] = True
+                    continue
                     
-                    # Step 4: 09:00 ~ 15:00 (10분 주기 모니터링)
-                    # (테스트용으로 1회만 실행)
-                    self.step_4_monitor_and_manage()
+                # Step 4: 09:00 ~ 15:00 정규장 시간 (10분 주기 모니터링)
+                if 900 <= time_val < 1500 and step_done["buy"]:
+                    # 보유 종목이 있을 때만 모니터링 실행
+                    if len(self.positions) > 0:
+                        self.step_4_monitor_and_manage()
+                    # 10분(=600초)을 대기 (텔레그램 등 백그라운드는 스레드로 동작하므로 무관함)
+                    time.sleep(600)
+                    continue
                     
-                    # Step 5: 15:00 (현금 확보 등 종료 전략)
+                # Step 5: 15:00 경과 & 미실행 시 (현금 확보 등 종료 전략)
+                if time_val >= 1500 and not step_done["close"]:
                     self.step_5_closing_strategy()
+                    step_done["close"] = True
+                    continue
                     
-                    # Step 6: 15:30 (마감 보고서)
+                # Step 6: 15:30 경과 & 미실행 시 (마감 보고서)
+                if time_val >= 1530 and not step_done["report"]:
                     self.step_6_daily_report()
+                    step_done["report"] = True
+                    logging.info("오늘의 정규 루틴이 모두 끝났습니다. 다음 거래일까지 대기합니다.")
+                    continue
                 
-                # 하루 사이클 종료 후, 실전에서는 다음날 08:20까지 sleep 합니다.
-                logging.info("오늘의 정규 루틴이 모두 끝났습니다. 다음 거래일까지 대기합니다.")
-                # 방지턱: 시연용이므로 루프를 한 번만 돌고 종료하도록 설정합니다.
-                # time.sleep(86400) 
-                break 
+                # 장시간, 혹은 장 마감 후의 평시 대기
+                time.sleep(60)
 
         except KeyboardInterrupt:
             logging.info("사용자 인터럽트로 시스템을 안전하게 종료합니다 (Graceful Shutdown).")
@@ -488,5 +535,16 @@ class AIQuantManager:
             self.send_telegram_msg("[비상] 봇 동작 중 치명적 오류가 발생했습니다. 로그를 확인하세요.")
 
 if __name__ == "__main__":
+    import threading
+    
+    # 텔레그램 봇을 백그라운드에서 실행
+    try:
+        from telegram_bot import run_telegram_bot
+        bot_thread = threading.Thread(target=run_telegram_bot, daemon=True)
+        bot_thread.start()
+        print(">> 텔레그램 봇 백그라운드 실행을 시작했습니다.")
+    except Exception as e:
+        print(f">> 텔레그램 봇 실행 실패: {e}")
+
     manager = AIQuantManager()
     manager.run_daily_loop()

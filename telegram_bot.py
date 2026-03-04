@@ -123,9 +123,46 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         system_prompt = (
             "당신은 'AI 주식 자동매매 봇'의 친절한 비서입니다. "
             "사용자의 질문에 한국어로 친절하고 알기 쉽게 답변해주세요. "
-            "주식 매매 상황이나 시스템 관련 질문이 아니어도 일상적인 대화에 자연스럽게 응답하면 됩니다."
+            "주식 매매 상황이나 시스템 관련 질문이 아니어도 일상적인 대화에 자연스럽게 응답하면 됩니다.\n"
         )
         
+        # 🤖 AI가 실제 데이터도 알고 있도록 최신 계좌 상태를 귓속말로 전달
+        try:
+            from src.api.koreainvestment import KoreaInvestmentAPI
+            api = KoreaInvestmentAPI()
+            api.get_access_token()
+            balance_data = api.get_account_balance()
+            
+            if balance_data:
+                cash = balance_data.get('cash', 0)
+                total = balance_data.get('total', 0)
+                stocks = balance_data.get('stocks', [])
+                
+                system_prompt += f"\n[현재 계좌 상태 요약 (고객에게 안내할 데이터)]\n"
+                system_prompt += f"- 주문 가능 현금: {cash:,.0f}원\n"
+                system_prompt += f"- 총 평가 금액: {total:,.0f}원\n"
+                
+                if stocks:
+                    system_prompt += "- 보유 종목: "
+                    for s in stocks:
+                        system_prompt += f"{s['name']}({s['qty']}주, 평단가 {s['avg_price']:,.0f}원), "
+                    system_prompt = system_prompt.rstrip(", ") + "\n"
+                else:
+                    system_prompt += "- 보유 종목: 없음 (현재 주식 없음)\n"
+                
+                system_prompt += "\n※ 사용자가 현재 보유 종목이나 수익, 계좌 상태 등을 물어보면 위 [현재 계좌 상태 요약] 데이터를 바탕으로 정확하게 알려주세요. 직접적인 열람 권한이 없다는 식의 거절은 절대 하지 마시고, 데이터를 자연스럽게 읽어주면 됩니다.\n"
+
+        except Exception as e:
+            logging.warning(f"Gemini 프롬프트용 데이터 조회 실패: {e}")
+            pass
+            
+        system_prompt += (
+            "\n[매우 중요한 지시사항! 반드시 지킬 것]\n"
+            "1. 당신은 고객의 '명령'에 따라 수동으로 매매하는 봇이 *아닙니다*. 당신은 시장 지표, 뉴스 모멘텀, 기술적 차트를 분석하여 매일 자동으로 100% 자율적인 매매를 진행하는 'AI 퀀트 주식 트레이더'입니다.\n"
+            "2. 절대로 고객에게 '어떤 종목을 살까요?', '얼마나 살까요?' 등 종목 추천이나 매매 지시를 되묻지 마세요.\n"
+            "3. 고객이 매매에 관해 물어보면, '저는 시장 상황을 실시간으로 분석하여 최적의 타이밍에 알아서 분할 매수 및 자동 매도를 진행하는 스마트한 AI입니다. 저를 믿고 맡겨주시면 최선을 다해 수익을 내겠습니다.'라는 식으로 든든하고 똑똑하게 답하세요."
+        )
+            
         response = client.models.generate_content(
             model='gemini-2.5-flash',
             contents=f"{system_prompt}\n\n사용자 메시지: {user_text}"
@@ -141,6 +178,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 def run_telegram_bot():
     """텔레그램 봇 리스너 실행 (Polling 방식)"""
+    
+    # 스레드 환경에서 이벤트 루프 문제 방지용 세팅
+    try:
+        import asyncio
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
     token = getattr(config, 'TELEGRAM_TOKEN', None)
     
     if not token:
