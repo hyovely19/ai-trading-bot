@@ -242,14 +242,9 @@ class KoreaInvestmentAPI:
             cash = 0.0
             total = 0.0
             if output2 and len(output2) > 0:
-                # 모의투자 및 실전투자 공통으로, 실제 주문 가능한 현금은 'dnca_tot_amt(원금)' 혹은 'prvs_rcdl_excc_amt(D+2정산금)' 등에서
-                # 오늘 매수한 주식 대금('thdt_buy_amt')과 당일 제비용('thdt_tlex_amt')을 현금에서 뺀 금액입니다.
-                base_cash = float(output2[0].get('dnca_tot_amt', 0))
-                thdt_buy_amt = float(output2[0].get('thdt_buy_amt', 0)) # 당일 매수 금액
-                thdt_tlex_amt = float(output2[0].get('thdt_tlex_amt', 0)) # 당일 제비용
-                
-                # 주문 가능 현금 = 예수금 총액 - 당일 매수 금액 - 당일 수수료
-                cash = base_cash - thdt_buy_amt - thdt_tlex_amt
+                # 한국투자증권에서 제공하는 D+2 정산 예수금(prvs_rcdl_excc_amt)이 실제 '주문 가능 현금'과 일치합니다.
+                # (매수 체결 시 증권사 서버에서 즉시 차감됨)
+                cash = float(output2[0].get('prvs_rcdl_excc_amt', 0))
                 total = float(output2[0].get('tot_evlu_amt', 0))
 
             return {

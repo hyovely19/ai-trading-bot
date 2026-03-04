@@ -286,8 +286,16 @@ class AIQuantManager:
                         "consecutive_down_days": 0
                     }
                     
-                    self.cash_balance -= (buy_qty * buy_price)
-                    msg = f"[신규 매수 성공]\n- 종목: {stock['name']}\n- 체결단가: {buy_price}원\n- 피라미딩 1단계(30%) 완료"
+                    # API로 최신 잔고 동기화 (체결 시간차 고려하여 1초 대기)
+                    time.sleep(1)
+                    balance_data = self.kis_api.get_account_balance()
+                    if balance_data:
+                        self.cash_balance = balance_data['cash']
+                        self.total_assets = balance_data['total']
+                    else:
+                        self.cash_balance -= (buy_qty * buy_price)
+                        
+                    msg = f"[신규 매수 성공]\n- 종목: {stock['name']}\n- 체결단가: {buy_price:,.0f}원\n- 피라미딩 1단계(30%) 완료\n💵 체결 후 주문 가능 현금: {self.cash_balance:,.0f}원"
                     self.send_telegram_msg(msg)
             except Exception as e:
                 logging.error(f"{stock['name']} 매수 주문 실패: {e}")
@@ -370,20 +378,40 @@ class AIQuantManager:
             ratio = config.PYRAMID_STAGE_2 if next_stage == 2 else config.PYRAMID_STAGE_3
             invest_amount = (config.TOTAL_CAPITAL * config.MAX_PER_STOCK_RATIO) * ratio
             
-            # API 추가 매수 호출 부분 (가상)
-            add_qty = 5
+            # 수량 계산을 위한 현재가
+            curr_prc = self.kis_api.get_current_price(code) or current_price
+            add_qty = int(invest_amount / curr_prc) if curr_prc > 0 else 0
             
-            # 평단가 재계산
-            total_value = (pos['avg_price'] * pos['quantity']) + (current_price * add_qty)
-            new_qty = pos['quantity'] + add_qty
-            new_avg_price = total_value / new_qty
+            if add_qty <= 0:
+                logging.warning(f"[{pos['name']}] 추가 매수 수량이 0입니다. (잔액/주가 부족)")
+                return
+                
+            # 실제 KIS API 매수 주문 호출 (시장가)
+            res = self.kis_api.buy_market_order(code, add_qty)
             
-            self.cash_balance -= (current_price * add_qty)
+            if res and res.get('rt_cd') == '0':
+                buy_price = float(res.get('output', {}).get('ord_unpr', 0)) or 0
+                buy_price = buy_price if buy_price > 0 else curr_prc
+                
+                # 평단가 재계산
+                total_value = (pos['avg_price'] * pos['quantity']) + (buy_price * add_qty)
+                new_qty = pos['quantity'] + add_qty
+                new_avg_price = total_value / new_qty
+            
+            # API로 최신 잔고 동기화 (체결 시간차 고려하여 1초 대기)
+            time.sleep(1)
+            balance_data = self.kis_api.get_account_balance()
+            if balance_data:
+                self.cash_balance = balance_data['cash']
+                self.total_assets = balance_data['total']
+            else:
+                self.cash_balance -= (current_price * add_qty)
+                
             pos['quantity'] = new_qty
             pos['avg_price'] = new_avg_price
             pos['pyramid_stage'] = next_stage
             
-            msg = f"[피라미딩 {next_stage}차 추매]\n- 종목: {pos['name']}\n- 평단가 변경: {new_avg_price:,.0f}원"
+            msg = f"[피라미딩 {next_stage}차 추매]\n- 종목: {pos['name']}\n- 평단가 변경: {new_avg_price:,.0f}원\n💵 체결 후 주문 가능 현금: {self.cash_balance:,.0f}원"
             self.send_telegram_msg(msg)
         except Exception as e:
             logging.error(f"{pos['name']} 추매 실패: {e}")
