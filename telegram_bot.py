@@ -2,18 +2,18 @@ import os
 import sys
 import logging
 import asyncio
-from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
+from telegram import Update # type: ignore
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes # type: ignore
 
 try:
-    from google import genai
+    from google import genai # type: ignore
 except ImportError:
     genai = None
 
 # 설정 값 가져오기용 패키지 경로 추가
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-import config
-from src.common_utils import get_today_str, is_market_open_time, read_recent_logs
+import config # type: ignore
+from src.common_utils import get_today_str, is_market_open_time, read_recent_logs # type: ignore
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -77,7 +77,7 @@ async def balance_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.send_chat_action(chat_id=chat_id, action='typing')
     
     try:
-        from src.api.koreainvestment import KoreaInvestmentAPI
+        from src.api.koreainvestment import KoreaInvestmentAPI # type: ignore
         api = KoreaInvestmentAPI()
         api.get_access_token()
         balance_data = api.get_account_balance()
@@ -139,7 +139,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     try:
         # Gemini 클라이언트 초기화 및 프롬프트 전송
-        client = genai.Client(api_key=api_key)
+        client = genai.Client(api_key=api_key) # type: ignore
         
         system_prompt = (
             "당신은 'AI 주식 자동매매 봇'의 친절한 비서입니다. "
@@ -149,7 +149,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         # 🤖 AI가 실제 데이터도 알고 있도록 최신 계좌 상태를 귓속말로 전달
         try:
-            from src.api.koreainvestment import KoreaInvestmentAPI
+            from src.api.koreainvestment import KoreaInvestmentAPI # type: ignore
             api = KoreaInvestmentAPI()
             api.get_access_token()
             balance_data = api.get_account_balance()
