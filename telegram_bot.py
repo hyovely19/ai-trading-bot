@@ -22,6 +22,7 @@ logging.basicConfig(
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """/start 명령어 입력시 나오는 메시지"""
+    if not update.effective_chat: return
     welcome_msg = (
         "👋 안녕하세요! AI 주식 자동매매 봇입니다.\n\n"
         "저는 현재 단방향 알림만 보내도록 설정되어 있었지만, 방금 양방향 소통 기능이 추가되었습니다!\n\n"
@@ -34,6 +35,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """/status 명령어 입력시 봇 동작 상태 출력"""
+    if not update.effective_chat: return
     is_open = is_market_open_time()
     market_status = "🟢 정규장 진행 중" if is_open else "🔴 장 마감 / 대기 중"
     
@@ -47,12 +49,14 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def logs_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """/logs 명령어 입력시 최근 로그 10줄 출력"""
+    if not update.effective_chat: return
     logs = read_recent_logs(lines=10)
     msg = f"📜 *[최근 로그 10줄]*\n\n```text\n{logs}\n```"
     await context.bot.send_message(chat_id=update.effective_chat.id, text=msg, parse_mode='Markdown')
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """/help 명령어 입력시 도움말 출력"""
+    if not update.effective_chat: return
     help_msg = (
         "💡 *[도움말]*\n\n"
         "저는 현재 여러분이 설정해둔 `config.py` 파일의 전략에 따라 매매를 수행합니다.\n"
@@ -63,6 +67,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def balance_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """/balance 명령어 입력시 현재 주식 및 현금 잔고 출력"""
+    if not update.effective_chat: return
     await context.bot.send_chat_action(chat_id=update.effective_chat.id, action='typing')
     
     try:
@@ -102,6 +107,7 @@ async def balance_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """지정되지 않은 일반 메시지를 AI 비서처럼 답변"""
+    if not update.effective_chat or not update.message or not update.message.text: return
     user_text = update.message.text
     
     # 자연어 명령어 맵핑 (한국어로 자연스럽게 물어봐도 동작하도록)
@@ -172,7 +178,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             contents=f"{system_prompt}\n\n사용자 메시지: {user_text}"
         )
         
-        answer = response.text
+        answer = response.text or ""
         await context.bot.send_message(chat_id=update.effective_chat.id, text=answer)
         
     except Exception as e:
@@ -185,7 +191,6 @@ def run_telegram_bot():
     
     # 스레드 환경에서 이벤트 루프 문제 방지용 세팅
     try:
-        import asyncio
         loop = asyncio.get_event_loop()
     except RuntimeError:
         loop = asyncio.new_event_loop()
