@@ -22,7 +22,8 @@ logging.basicConfig(
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """/start 명령어 입력시 나오는 메시지"""
-    if not update.effective_chat: return
+    chat = update.effective_chat
+    if not chat: return
     welcome_msg = (
         "👋 안녕하세요! AI 주식 자동매매 봇입니다.\n\n"
         "저는 현재 단방향 알림만 보내도록 설정되어 있었지만, 방금 양방향 소통 기능이 추가되었습니다!\n\n"
@@ -31,11 +32,12 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/logs - 최근 봇 작업 로그 확인\n"
         "/help - 도움말 보기"
     )
-    await context.bot.send_message(chat_id=update.effective_chat.id, text=welcome_msg)
+    await context.bot.send_message(chat_id=chat.id, text=welcome_msg)
 
 async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """/status 명령어 입력시 봇 동작 상태 출력"""
-    if not update.effective_chat: return
+    chat = update.effective_chat
+    if not chat: return
     is_open = is_market_open_time()
     market_status = "🟢 정규장 진행 중" if is_open else "🔴 장 마감 / 대기 중"
     
@@ -45,30 +47,34 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"시장 상태: {market_status}\n\n"
         f"✅ 봇이 정상적으로 프로그램을 모니터링하고 있습니다."
     )
-    await context.bot.send_message(chat_id=update.effective_chat.id, text=msg)
+    await context.bot.send_message(chat_id=chat.id, text=msg)
 
 async def logs_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """/logs 명령어 입력시 최근 로그 10줄 출력"""
-    if not update.effective_chat: return
+    chat = update.effective_chat
+    if not chat: return
     logs = read_recent_logs(lines=10)
     msg = f"📜 *[최근 로그 10줄]*\n\n```text\n{logs}\n```"
-    await context.bot.send_message(chat_id=update.effective_chat.id, text=msg, parse_mode='Markdown')
+    await context.bot.send_message(chat_id=chat.id, text=msg, parse_mode='Markdown')
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """/help 명령어 입력시 도움말 출력"""
-    if not update.effective_chat: return
+    chat = update.effective_chat
+    if not chat: return
     help_msg = (
         "💡 *[도움말]*\n\n"
         "저는 현재 여러분이 설정해둔 `config.py` 파일의 전략에 따라 매매를 수행합니다.\n"
         "장 중(09:00~15:30)에는 자동으로 종목을 탐색하고 매매를 진행합니다.\n\n"
         "궁금한 점이 있으시면 /logs 로 최근 기록을 확인해 보세요!"
     )
-    await context.bot.send_message(chat_id=update.effective_chat.id, text=help_msg, parse_mode='Markdown')
+    await context.bot.send_message(chat_id=chat.id, text=help_msg, parse_mode='Markdown')
 
 async def balance_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """/balance 명령어 입력시 현재 주식 및 현금 잔고 출력"""
-    if not update.effective_chat: return
-    await context.bot.send_chat_action(chat_id=update.effective_chat.id, action='typing')
+    chat = update.effective_chat
+    if not chat: return
+    chat_id = chat.id
+    await context.bot.send_chat_action(chat_id=chat_id, action='typing')
     
     try:
         from src.api.koreainvestment import KoreaInvestmentAPI
@@ -77,11 +83,11 @@ async def balance_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         balance_data = api.get_account_balance()
         
         if not balance_data:
-            await context.bot.send_message(chat_id=update.effective_chat.id, text="⚠️ 봇 시스템 오류로 잔고 정보를 불러오는데 실패했습니다.")
+            await context.bot.send_message(chat_id=chat_id, text="⚠️ 봇 시스템 오류로 잔고 정보를 불러오는데 실패했습니다.")
             return
             
         if 'error' in balance_data:
-            await context.bot.send_message(chat_id=update.effective_chat.id, text=f"⚠️ 증권사 API 통신 거절: {balance_data['error']}\n\n(클라우드 서버나 해외 IP에서 접속하여 차단되었을 확률이 매우 높습니다. Railway 서버를 정지해주세요.)")
+            await context.bot.send_message(chat_id=chat_id, text=f"⚠️ 증권사 API 통신 거절: {balance_data['error']}\n\n(클라우드 서버나 해외 IP에서 접속하여 차단되었을 확률이 매우 높습니다. Railway 서버를 정지해주세요.)")
             return
             
         cash = balance_data.get('cash', 0)
@@ -99,16 +105,21 @@ async def balance_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             msg += "텅~ 현재 보유 중인 주식이 없습니다."
             
-        await context.bot.send_message(chat_id=update.effective_chat.id, text=msg, parse_mode='Markdown')
+        await context.bot.send_message(chat_id=chat_id, text=msg, parse_mode='Markdown')
         
     except Exception as e:
         logging.error(f"잔고 조회 중 에러: {e}")
-        await context.bot.send_message(chat_id=update.effective_chat.id, text=f"⚠️ 잔고 조회 중 에러가 발생했습니다: {e}")
+        await context.bot.send_message(chat_id=chat_id, text=f"⚠️ 잔고 조회 중 에러가 발생했습니다: {e}")
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """지정되지 않은 일반 메시지를 AI 비서처럼 답변"""
-    if not update.effective_chat or not update.message or not update.message.text: return
-    user_text = update.message.text
+    chat = update.effective_chat
+    if not chat: return
+    chat_id = chat.id
+    
+    msg_obj = update.message
+    if not msg_obj or not msg_obj.text: return
+    user_text = msg_obj.text
     
     # 자연어 명령어 맵핑 (한국어로 자연스럽게 물어봐도 동작하도록)
     if any(keyword in user_text for keyword in ["잔고", "자산", "얼마", "계좌"]):
@@ -120,11 +131,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not api_key or not genai:
         reason = f"KEY:{'O' if api_key else 'X'}, GENAI:{'O' if genai else 'X'}"
         msg = f"죄송합니다. 현재 설정 문제({reason})로 인해 정해진 명령어만 수행할 수 있습니다. /help 를 참고해주세요."
-        await context.bot.send_message(chat_id=update.effective_chat.id, text=msg)
+        await context.bot.send_message(chat_id=chat_id, text=msg)
         return
 
     # 타이핑 중이라는 상태 표시 송신 (사용자 입장에서 로딩중 느낌)
-    await context.bot.send_chat_action(chat_id=update.effective_chat.id, action='typing')
+    await context.bot.send_chat_action(chat_id=chat_id, action='typing')
     
     try:
         # Gemini 클라이언트 초기화 및 프롬프트 전송
@@ -179,12 +190,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         
         answer = response.text or ""
-        await context.bot.send_message(chat_id=update.effective_chat.id, text=answer)
+        await context.bot.send_message(chat_id=chat_id, text=answer)
         
     except Exception as e:
         logging.error(f"Gemini API 호출 중 에러 발생: {e}")
         error_msg = "앗, AI 서버와 통신하는 중에 문제가 발생했어요. 잠시 후 다시 시도해 주세요!"
-        await context.bot.send_message(chat_id=update.effective_chat.id, text=error_msg)
+        await context.bot.send_message(chat_id=chat_id, text=error_msg)
 
 def run_telegram_bot():
     """텔레그램 봇 리스너 실행 (Polling 방식)"""
