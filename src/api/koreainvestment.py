@@ -1,8 +1,8 @@
 # 한국투자증권 API와의 통신을 담당하는 파일입니다.
-import requests
+import requests # type: ignore
 import json
 import os
-from dotenv import load_dotenv
+from dotenv import load_dotenv # type: ignore
 
 # config 폴더 안의 .env 파일을 찾아 로드합니다.
 base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -20,7 +20,7 @@ class KoreaInvestmentAPI:
         import sys
         if base_dir not in sys.path:
             sys.path.append(base_dir)
-        import config
+        import config # type: ignore
         
         self.app_key = config.KIS_APP_KEY or os.getenv("APP_KEY")
         self.app_secret = config.KIS_APP_SECRET or os.getenv("APP_SECRET")
@@ -225,7 +225,14 @@ class KoreaInvestmentAPI:
         
         try:
             response = requests.get(url, headers=headers, params=params)
-            res_data = response.json()
+            
+            try:
+                res_data = response.json()
+            except json.JSONDecodeError:
+                error_msg = f"서버 응답 파싱 실패 (HTTP {response.status_code}). WAF 등 IP 차단 방화벽에 막혔을 수 있습니다."
+                print(f"[오류] {error_msg}")
+                return {'error': error_msg}
+
             if res_data.get('rt_cd') != '0':
                 error_msg = res_data.get('msg1', '알 수 없는 에러')
                 print(f"[오류] 잔고 조회 API 에러: {error_msg}")
