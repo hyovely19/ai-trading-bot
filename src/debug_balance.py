@@ -1,10 +1,14 @@
+import os
 import sys
-import requests
 
-base_dir = r"c:\Users\sunny\Desktop\bootcamp_test\ai_trading_bot"
-sys.path.append(base_dir)
+# 프로젝트 루트 경로를 동적으로 구해서 sys.path에 최우선으로 추가합니다.
+current_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.dirname(current_dir)
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 
-from src.api.koreainvestment import KoreaInvestmentAPI
+import requests # type: ignore
+from src.api.koreainvestment import KoreaInvestmentAPI # type: ignore
 
 def check_raw_balance():
     api = KoreaInvestmentAPI()
