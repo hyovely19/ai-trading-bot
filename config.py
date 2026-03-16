@@ -35,17 +35,17 @@ def get_secret(section: str, key: str, env_key: str):
 # 운용 기준 자본금 (기본값: 100,000,000원 = 모의투자 기본 제공)
 TOTAL_CAPITAL = 100000000
 
-# 평상시 최소 현금 비중 (기본값: 0.10 = 10%)
-CASH_BUFFER_RATIO = 0.10
+# 평상시 최소 현금 비중 (기본값: 0.40 = 40%, 투자유예금)
+CASH_BUFFER_RATIO = 0.40
 
 # 최대 보유 종목 수 (기본값: 5)
 MAX_POSITIONS = 5
 
-# 종목당 최대 투자 비중 (기본값: 0.10 = 10%)
-MAX_PER_STOCK_RATIO = 0.10
+# 종목당 최대 투자 비중 (기본값: 0.12 = 12%, 5종목 x 12% = 총 60% 투자)
+MAX_PER_STOCK_RATIO = 0.12
 
 # 1회 투자 비중 (비율) - 기존 속성 유지 (MAX_PER_STOCK_RATIO와 용도 유사)
-INVESTMENT_RATIO = 0.10
+INVESTMENT_RATIO = 0.12
 
 # [2. 손절/익절 규칙]
 # 손절 기준 (기본값: -0.07 = -7%)
@@ -66,14 +66,14 @@ TAKE_PROFIT_FULL = 0.125
 
 
 # [3. 피라미딩 (분할 매수)]
-# 1단계 비중 (기본값: 0.30 = 30%)
-PYRAMID_STAGE_1 = 0.30
+# 1단계 비중 (기본값: 1.0 = 100%, 처음 매수 시 배정된 12%를 전액 매수하여 총 60% 꽉 채움)
+PYRAMID_STAGE_1 = 1.0
 
-# 2단계 비중 (기본값: 0.30 = 30%)
-PYRAMID_STAGE_2 = 0.30
+# 2단계 비중 (사용 안 함)
+PYRAMID_STAGE_2 = 0.0
 
-# 3단계 비중 (기본값: 0.40 = 40%)
-PYRAMID_STAGE_3 = 0.40
+# 3단계 비중 (사용 안 함)
+PYRAMID_STAGE_3 = 0.0
 
 # 2단계 진입 조건 (기본값: 0.02 = +2%)
 PYRAMID_TRIGGER_2 = 0.02

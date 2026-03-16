@@ -7,7 +7,7 @@ from typing import Dict, List, Any
 
 # 구글 Gemini 연동 패키지: google-genai 기준
 try:
-    from google import genai
+    from google import genai # type: ignore
 except ImportError:
     pass # 실제 환경에 맞게 설치 필요
 
@@ -17,12 +17,12 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(
 
 # 시스템 설정 파일 불러오기
 try:
-    import config
-    from src.utils.risk_manager import RiskManager
-    from src.utils.ai_hit_tracker import AIHitTracker
-    from src.common_utils import logger, send_telegram_msg
+    import config # type: ignore
+    from src.utils.risk_manager import RiskManager # type: ignore
+    from src.utils.ai_hit_tracker import AIHitTracker # type: ignore
+    from src.common_utils import logger, send_telegram_msg # type: ignore
     # 통신 및 API 모듈
-    from src.api.koreainvestment import KoreaInvestmentAPI
+    from src.api.koreainvestment import KoreaInvestmentAPI # type: ignore
 except ImportError as e:
     logging.error(f"필수 모듈 임포트 에러: {e}")
     pass
@@ -58,7 +58,7 @@ class AIQuantManager:
         self.total_assets = 0.0
         self.cash_balance = 0.0
         self.is_running = False
-        self.selected_stocks = []
+        self.selected_stocks: List[Dict[str, Any]] = []
 
     def send_telegram_msg(self, message: str):
         """
@@ -101,9 +101,9 @@ class AIQuantManager:
                     self.cash_balance = balance_data['cash']
                     self.total_assets = balance_data['total']
                     # 포지션 동기화
-                    self.positions = {}
+                    self.positions.clear()
                     for s in balance_data['stocks']:
-                        self.positions[s['code']] = {
+                        self.positions[s['code']] = { # type: ignore
                             "name": s['name'],
                             "quantity": s['qty'],
                             "avg_price": s['avg_price'],
@@ -217,7 +217,7 @@ class AIQuantManager:
             logging.info("모드가 DEFENSIVE이므로 신규 종목 선정을 건너뜁니다.")
             return []
             
-        selected_stocks = []
+        selected_stocks: List[Dict[str, Any]] = []
         for stock in config.UNIVERSE:
             ai_result = self.analyze_with_gemini(stock)
             logging.info(f"[{stock['name']}] AI 평가 점수: {ai_result['score']}점")
@@ -233,7 +233,7 @@ class AIQuantManager:
                 
         # 점수 높은 순 정렬 후 모드별 개수만큼 자르기
         selected_stocks.sort(key=lambda x: x['score'], reverse=True)
-        final_list = selected_stocks[:self.max_today_positions]
+        final_list = selected_stocks[:int(self.max_today_positions)] # type: ignore
         
         logging.info(f"선정된 매수 대상 종목: {[s['name'] for s in final_list]}")
         return final_list
@@ -259,7 +259,7 @@ class AIQuantManager:
             # 매수 전 RiskManager 확인 (가상)
             # if not self.risk_manager.can_buy(self.cash_balance, ...): continue
             
-            # 피라미딩 1단계 비중(30%)로 투입 금액 계산
+            # 할당된 종목별 비중(12%) 전액 매수 진행 (총 씨드의 60% 목표 중 해당 종목분)
             invest_amount = (config.TOTAL_CAPITAL * config.MAX_PER_STOCK_RATIO) * config.PYRAMID_STAGE_1
             current_price = self.kis_api.get_current_price(code) or 1 # 수량 계산을 위한 현재가
             buy_qty = int(invest_amount / current_price) if current_price > 0 else 0
@@ -291,7 +291,7 @@ class AIQuantManager:
                     if self.cash_balance >= deducted_amount:
                         self.cash_balance -= deducted_amount
                         
-                    msg = f"[신규 매수 성공]\n- 종목: {stock['name']}\n- 매수 수량: {buy_qty}주\n- 체결단가: {buy_price:,.0f}원\n- 피라미딩 1단계(30%) 완료\n💵 체결 후 주문 가능 현금: {self.cash_balance:,.0f}원\n(※ 증권사 시스템 지연 시 /balance 명령어에 늦게 반영될 수 있습니다.)"
+                    msg = f"[신규 매수 성공]\n- 종목: {stock['name']}\n- 매수 수량: {buy_qty}주\n- 체결단가: {buy_price:,.0f}원\n- 신규 매수 완료 (총 씨드 60% 집중투자 중)\n💵 체결 후 주문 가능 현금: {self.cash_balance:,.0f}원\n(※ 증권사 시스템 지연 시 /balance 명령어에 늦게 반영될 수 있습니다.)"
                     self.send_telegram_msg(msg)
             except Exception as e:
                 logging.error(f"{stock['name']} 신규 매수 중 스크립트 내부 에러 발생: {e}")
@@ -361,7 +361,7 @@ class AIQuantManager:
                 msg = f"[매도 완료]\n- 종목: {pos['name']}\n- 사유: {reason}"
                 self.send_telegram_msg(msg)
                 # 포지션에서 제거
-                del self.positions[code]
+                self.positions.pop(code, None)
             else:
                 logging.error(f"{pos['name']} 매도 주문 거부: {res.get('msg1')}")
         except Exception as e:
@@ -465,7 +465,7 @@ class AIQuantManager:
         logging.info("AI Quant 메인 루프를 시작합니다.")
         
         # 오늘 하루 스텝 진행 여부를 기록하는 플래그
-        step_done = {
+        step_done: Dict[str, bool] = {
             "init": False,
             "macro": False,
             "select": False,
@@ -482,7 +482,8 @@ class AIQuantManager:
                 
                 # 날짜가 바뀌면 스텝 플래그 초기화
                 if now.date() != last_date:
-                    step_done = {k: False for k in step_done}
+                    for k in step_done:
+                        step_done[k] = False
                     last_date = now.date()
                     
                 # 시간(시, 분) 추출
@@ -501,7 +502,8 @@ class AIQuantManager:
                     step_done["init"] = True
                     if not is_ready:
                         # 오늘 하루 더이상 진행하지 않도록 임시 플래그 처리
-                        step_done = {k: True for k in step_done}
+                        for k in step_done:
+                            step_done[k] = True
                     continue
 
                 # Step 1: 08:22 경과 & 미실행 시 (거시경제 파악)
@@ -559,7 +561,7 @@ if __name__ == "__main__":
     
     # 텔레그램 봇을 백그라운드에서 실행
     try:
-        from telegram_bot import run_telegram_bot
+        from telegram_bot import run_telegram_bot # type: ignore
         bot_thread = threading.Thread(target=run_telegram_bot, daemon=True)
         bot_thread.start()
         print(">> 텔레그램 봇 백그라운드 실행을 시작했습니다.")

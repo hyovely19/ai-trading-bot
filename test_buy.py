@@ -3,7 +3,7 @@ import json
 import logging
 sys.path.append(r"c:\Users\sunny\Desktop\bootcamp_test\ai_trading_bot")
 
-from src.api.koreainvestment import KoreaInvestmentAPI
+from src.api.koreainvestment import KoreaInvestmentAPI # type: ignore
 
 logging.basicConfig(level=logging.INFO)
 

@@ -40,6 +40,20 @@ class KoreaInvestmentAPI:
             "charset": "UTF-8",
         }
         
+        # [프록시 서버 설정] Railway 고정 IP 우회 등을 위한 추가 세팅
+        user = os.getenv('PROXY_USER')
+        password = os.getenv('PROXY_PASS')
+        ip = os.getenv('PROXY_IP')
+        port = os.getenv('PROXY_PORT')
+        
+        self.proxies: dict[str, str] | None = None
+        if user and password and ip and port:
+            proxy_url = f"http://{user}:{password}@{ip}:{port}"
+            self.proxies = {
+                'http': proxy_url,
+                'https': proxy_url
+            }
+        
     def get_access_token(self):
         """
         API를 사용하기 위한 접근 권한(토큰)을 발급받습니다.
@@ -74,8 +88,8 @@ class KoreaInvestmentAPI:
         }
         
         try:
-            # 증권사 서버로 토큰 발급 요청 보내기
-            response = requests.post(url, headers=self.headers, data=json.dumps(body))
+            # 증권사 서버로 토큰 발급 요청 보내기 (프록시 적용, 차단시 무한 대기 방지)
+            response = requests.post(url, headers=self.headers, data=json.dumps(body), proxies=self.proxies, timeout=10)
             
             # 200은 서버가 요청을 정상적으로 처리했다는 의미입니다.
             if response.status_code == 200:
@@ -129,7 +143,8 @@ class KoreaInvestmentAPI:
         }
         
         try:
-            response = requests.get(url, headers=headers, params=params)
+            # 현재가 조회 요청 (프록시 적용, 차단시 무한 대기 방지)
+            response = requests.get(url, headers=headers, params=params, proxies=self.proxies, timeout=10)
             
             if response.status_code == 200:
                 result = response.json()
@@ -165,7 +180,8 @@ class KoreaInvestmentAPI:
         }
         
         try:
-            response = requests.post(url, headers=headers, data=json.dumps(body))
+            # 매수 주문 (프록시 적용, 차단시 무한 대기 방지)
+            response = requests.post(url, headers=headers, data=json.dumps(body), proxies=self.proxies, timeout=10)
             return response.json()
         except Exception as e:
             print(f"[오류] 매수 주문 중 오류 발생: {e}")
@@ -192,7 +208,8 @@ class KoreaInvestmentAPI:
         }
         
         try:
-            response = requests.post(url, headers=headers, data=json.dumps(body))
+            # 매도 주문 (프록시 적용, 차단시 무한 대기 방지)
+            response = requests.post(url, headers=headers, data=json.dumps(body), proxies=self.proxies, timeout=10)
             return response.json()
         except Exception as e:
             print(f"[오류] 매도 주문 중 오류 발생: {e}")
@@ -224,7 +241,8 @@ class KoreaInvestmentAPI:
         }
         
         try:
-            response = requests.get(url, headers=headers, params=params)
+            # 계좌 잔고 조회 (프록시 적용, 차단시 무한 대기 방지)
+            response = requests.get(url, headers=headers, params=params, proxies=self.proxies, timeout=10)
             
             try:
                 res_data = response.json()
