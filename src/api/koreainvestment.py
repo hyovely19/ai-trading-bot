@@ -219,7 +219,10 @@ class KoreaInvestmentAPI:
         """
         현재 내 계좌의 잔고(보유 예수금 및 주식)를 조회합니다.
         """
-        if not self.access_token: return None
+        if not self.access_token: 
+            error_msg = "API 접근 권한(토큰) 조차 발급받지 못했습니다. KIS 서버에 접근이 완벽히 차단된 상태입니다."
+            print(f"[오류] {error_msg}")
+            return {'error': error_msg}
         url = f"{self.url_base}/uapi/domestic-stock/v1/trading/inquire-balance"
         
         headers = self.headers.copy()
@@ -282,5 +285,6 @@ class KoreaInvestmentAPI:
                 'stocks': stocks
             }
         except Exception as e:
-            print(f"[오류] 잔고 조회 중 오류 발생: {e}")
-            return None
+            error_msg = f"잔고 조회 중 서버 오류 발생: {e}"
+            print(f"[오류] {error_msg}")
+            return {'error': error_msg}
