@@ -1,6 +1,7 @@
-import requests
+from typing import Optional
+import requests # type: ignore
 import json
-import config
+import config # type: ignore
 
 # ==========================================
 # [API 통신 모듈] 한국투자증권 API 통신 담당
@@ -8,10 +9,10 @@ import config
 
 class KISApiClient:
     def __init__(self):
-        self.base_url = config.BASE_URL
-        self.app_key = config.APP_KEY
-        self.app_secret = config.APP_SECRET
-        self.access_token = None
+        self.base_url = config.KIS_BASE_URL
+        self.app_key = config.KIS_APP_KEY
+        self.app_secret = config.KIS_APP_SECRET
+        self.access_token: Optional[str] = None
         
     def get_access_token(self):
         """

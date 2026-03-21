@@ -1,6 +1,6 @@
 import os
 import configparser
-from dotenv import load_dotenv
+from dotenv import load_dotenv # type: ignore
 
 # config 폴더 안의 .env 파일을 확실하게 로드합니다.
 base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -119,6 +119,7 @@ TELEGRAM_CHAT_ID = get_secret('TELEGRAM', 'CHAT_ID', 'TELEGRAM_CHAT_ID')
 
 
 # [8. 한투 API 설정]
+KIS_BASE_URL = "https://openapi.koreainvestment.com:9443" # 실전 투자용 기본 주소
 KIS_APP_KEY = get_secret('KIS', 'APP_KEY', 'KIS_APP_KEY')
 KIS_APP_SECRET = get_secret('KIS', 'APP_SECRET', 'KIS_APP_SECRET')
 KIS_ACCOUNT_NO = get_secret('KIS', 'ACCOUNT_NO', 'KIS_ACCOUNT_NO')

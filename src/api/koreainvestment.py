@@ -24,7 +24,8 @@ class KoreaInvestmentAPI:
         
         self.app_key = config.KIS_APP_KEY or os.getenv("APP_KEY")
         self.app_secret = config.KIS_APP_SECRET or os.getenv("APP_SECRET")
-        self.url_base = os.getenv("URL_BASE", "https://openapivts.koreainvestment.com:29443")
+        # config.py의 KIS_BASE_URL을 우선 참조하되, 없을 경우 환경변수나 기본값(모의투자)을 사용합니다.
+        self.url_base = getattr(config, 'KIS_BASE_URL', os.getenv("URL_BASE", "https://openapivts.koreainvestment.com:29443"))
         
         cano = config.KIS_ACCOUNT_NO or os.getenv("CANO")
         self.account_no = cano.replace('-', '') if cano else ""

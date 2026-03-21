@@ -1,6 +1,8 @@
 #!/bin/bash
-echo "Installing google-genai..."
-pip install google-genai
+export PYTHONIOENCODING=utf-8
 
-echo "Starting AI Quant Manager..."
-python src/utils/ai_quant_manager.py
+echo "Installing requirements from requirements.txt..."
+pip install -r requirements.txt
+
+echo "Starting AI Stock Trading Bot (main.py)..."
+python main.py

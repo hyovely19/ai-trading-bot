@@ -11,7 +11,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 def main():
     print("=" * 50)
-    print("🚀 로컬 환경용 AI 주식 자동매매 봇 구동을 시작합니다.")
+    print("로컬 환경용 AI 주식 자동매매 봇 구동을 시작합니다.")
     print("텔레그램에서 100% 정상 작동하며 해외 IP 차단 문제가 발생하지 않습니다.")
     print("=" * 50)
 
@@ -20,9 +20,9 @@ def main():
         from telegram_bot import run_telegram_bot # type: ignore
         bot_thread = threading.Thread(target=run_telegram_bot, daemon=True)
         bot_thread.start()
-        print(">> ✅ 텔레그램 봇 백그라운드 리스너 시작 완료")
+        print(">> [성공] 텔레그램 봇 백그라운드 리스너 시작 완료")
     except Exception as e:
-        print(f">> ❌ 텔레그램 봇 실행 실패: {e}")
+        print(f">> [실패] 텔레그램 봇 실행 실패: {e}")
 
     # 2. 메인 스레드에서 AI 퀀트 매니저(자동매매 엔진) 실행
     try:
